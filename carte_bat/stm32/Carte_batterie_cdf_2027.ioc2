@@ -539,7 +539,7 @@
     },
     "HAL_GPIO_PROJECT_USE_HAL": {
       "name": "HAL_GPIO_PROJECT_USE_HAL",
-      "value": 6,
+      "value": 7,
       "originator": "sw-config-semaphore"
     },
     "HAL_FDCAN_PROJECT_USE_HAL": {
@@ -631,7 +631,51 @@
 {
   "version": 10,
   "pinout-configuration": {
-    "userConfigurations": [],
+    "userConfigurations": [
+      {
+        "pin": {
+          "name": "PA3",
+          "position": "9",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 3,
+          "port": "A"
+        },
+        "signal": {
+          "instance": "GPIOA",
+          "name": "GPIO",
+          "type": "user_gpio"
+        },
+        "pinned": true
+      },
+      {
+        "pin": {
+          "name": "PA2",
+          "position": "8",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "t",
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 2,
+          "port": "A"
+        },
+        "signal": {
+          "instance": "GPIOA",
+          "name": "GPIO",
+          "type": "user_gpio"
+        },
+        "pinned": true
+      }
+    ],
     "needConfigurations": [
       {
         "id": "8cd25e8a-9a9b-4d9c-b33a-cf839973ae86",
@@ -784,13 +828,61 @@
     ]
   },
   "pinout-excluded-pins": [],
-  "pinout-labels": [],
-  "pinout-gpio-assignations": [],
+  "pinout-labels": [
+    {
+      "position": "9",
+      "labels": [
+        "AU"
+      ]
+    },
+    {
+      "position": "8",
+      "labels": [
+        "POWER_CONTROLE"
+      ]
+    }
+  ],
+  "pinout-gpio-assignations": [
+    {
+      "gpioGroupId": "default_gpio_group_id",
+      "softwareProjectId": "221b8ddd-b2b7-4a03-94c0-e5989cd20a84",
+      "swInstanceId": "6cae22d0-0e05-4e19-8324-1c487721816e",
+      "instanceName": "GPIO"
+    }
+  ],
   "pinout-gpio-groups": [
     {
       "id": "default_gpio_group_id",
       "name": "gpio_default",
-      "pins": []
+      "pins": [
+        {
+          "name": "PA3",
+          "position": "9",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 3,
+          "port": "A"
+        },
+        {
+          "name": "PA2",
+          "position": "8",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "t",
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 2,
+          "port": "A"
+        }
+      ]
     }
   ],
   "pinout-gpio-needs": [
@@ -1121,6 +1213,14 @@ solution:
         "id": "55215504-cfbb-4226-b513-0b2d08f9a27f",
         "componentDescriptionId": "STMicroelectronics.stm32c5xx_hal_drivers.2.1.0$STMicroelectronics::Device:STM32CubeMX2 Config:I2C@2.1.0#HAL CORE GPIO DMA Init and I2C",
         "label": "STM32CubeMX2 Config:I2C",
+        "expanded": true,
+        "userAdded": true
+      },
+      {
+        "$type": "http://st.com/schema/sw-composer#//MultiInstanceSWComponent",
+        "id": "ea29464f-cb1a-4484-9ea9-b75f19290054",
+        "componentDescriptionId": "STMicroelectronics.stm32c5xx_hal_drivers.2.1.0$STMicroelectronics::Device:STM32CubeMX2 Config:GPIO@2.1.0#HAL GPIO Init",
+        "label": "STM32CubeMX2 Config:GPIO",
         "expanded": true,
         "userAdded": true
       }
@@ -1930,6 +2030,17 @@ solution:
                   "mode": "I2C",
                   "name": "mx_i2c1_i2c_init",
                   "peripheral": "I2C"
+                },
+                {
+                  "_foreignKey": "gpio_default",
+                  "_rank": 3,
+                  "callable": true,
+                  "generated": true,
+                  "hw_instance": "gpio_default",
+                  "layer": "HAL",
+                  "mode": "",
+                  "name": "mx_gpio_default_init",
+                  "peripheral": "GPIO"
                 }
               ],
               "code_generation": {
@@ -2325,6 +2436,42 @@ solution:
           }
         }
       ],
+      "STMicroelectronics.stm32c5xx_hal_drivers.2.1.0$STMicroelectronics::Device:STM32CubeMX2 Config:GPIO@2.1.0#HAL GPIO Init": [
+        {
+          "index": 10,
+          "instanceId": "6cae22d0-0e05-4e19-8324-1c487721816e",
+          "entity": "gpio.groups",
+          "settings": {
+            "parameters": {
+              "info": {
+                "labels": [],
+                "layer": "HAL",
+                "init_type": "called"
+              },
+              "pins": [
+                {
+                  "_foreignKey": "PA2",
+                  "basic": {
+                    "mode": "INPUT",
+                    "pull": "NO",
+                    "enable_exti": false
+                  },
+                  "label_name": []
+                },
+                {
+                  "_foreignKey": "PA3",
+                  "basic": {
+                    "mode": "INPUT",
+                    "pull": "NO",
+                    "enable_exti": false
+                  },
+                  "label_name": []
+                }
+              ]
+            }
+          }
+        }
+      ],
       "STMicroelectronics.stm32c5xx_hal_drivers.2.1.0$STMicroelectronics::Device:STM32 LL:GPIO@2.1.0#LL": [
         {
           "index": 0,
@@ -2687,6 +2834,7 @@ project:
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:CORTEX MPU@2.1.0
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:CORTEX NVIC@2.1.0
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:FDCAN@2.1.0
+    - component: STMicroelectronics::Device:STM32CubeMX2 Config:GPIO@2.1.0
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:I2C@2.1.0
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:ICACHE@2.1.0
     - component: STMicroelectronics::Device:STM32CubeMX2 Config:RCC@2.1.0

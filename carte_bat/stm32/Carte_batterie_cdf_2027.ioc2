@@ -674,6 +674,48 @@
           "type": "user_gpio"
         },
         "pinned": true
+      },
+      {
+        "pin": {
+          "name": "PA5",
+          "position": "11",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 5,
+          "port": "A"
+        },
+        "signal": {
+          "instance": "GPIOA",
+          "name": "GPIO",
+          "type": "user_gpio"
+        },
+        "pinned": true
+      },
+      {
+        "pin": {
+          "name": "PA7",
+          "position": "13",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 7,
+          "port": "A"
+        },
+        "signal": {
+          "instance": "GPIOA",
+          "name": "GPIO",
+          "type": "user_gpio"
+        },
+        "pinned": true
       }
     ],
     "needConfigurations": [
@@ -840,6 +882,18 @@
       "labels": [
         "POWER_CONTROLE"
       ]
+    },
+    {
+      "position": "11",
+      "labels": [
+        "warnning"
+      ]
+    },
+    {
+      "position": "13",
+      "labels": [
+        "led"
+      ]
     }
   ],
   "pinout-gpio-assignations": [
@@ -880,6 +934,32 @@
           "ioType": "I/O",
           "ioStructure": "FT",
           "index": 2,
+          "port": "A"
+        },
+        {
+          "name": "PA5",
+          "position": "11",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 5,
+          "port": "A"
+        },
+        {
+          "name": "PA7",
+          "position": "13",
+          "type": "gpio",
+          "powerSource": "VDD",
+          "ioStructureOptions": [
+            "a"
+          ],
+          "ioType": "I/O",
+          "ioStructure": "FT",
+          "index": 7,
           "port": "A"
         }
       ]
@@ -2466,6 +2546,24 @@ solution:
                     "enable_exti": false
                   },
                   "label_name": []
+                },
+                {
+                  "_foreignKey": "PA5",
+                  "basic": {
+                    "mode": "INPUT",
+                    "pull": "NO",
+                    "enable_exti": false
+                  },
+                  "label_name": []
+                },
+                {
+                  "_foreignKey": "PA7",
+                  "basic": {
+                    "mode": "INPUT",
+                    "pull": "NO",
+                    "enable_exti": false
+                  },
+                  "label_name": []
                 }
               ]
             }
@@ -2858,4 +2956,4 @@ project:
 ["Project Description"]
 workingAreaId = "3592e7d7-e939-49a4-b2d7-9631b41a3b53"
 version = "1"
-mx2Version = "1.1.0"
+mx2Version = "1.1.1"

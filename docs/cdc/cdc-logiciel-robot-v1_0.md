@@ -1781,6 +1781,27 @@ chaque compétition.
   d'actionneur après la fin de la préparation. Chronométré, il doit tenir sous trois
   minutes avec de la marge.
 
+### 13.4 Connexions et leurs replis, vue d'ensemble
+
+Principe tenu partout dans ce document : chaque sous-système démarre en supposant la
+connectivité disponible, mais aucun n'en dépend pour démarrer ou pour rester sûr. Cette
+table n'introduit rien de nouveau, elle indexe où chaque cas est traité — le détail reste
+dans la section citée, pas ici.
+
+| Connexion | Garde-fou | Conséquence si absente | Renvoi |
+|---|---|---|---|
+| Robot → cartes STM32 (bus CAN) | Chien de garde par carte, freinage autonome au silence, empreinte de protocole | La carte silencieuse freine seule ; le reste du bus continue | 7.3, 8.4, LOG-EXS-06 |
+| Noyau (`core`) → `nav` | Redémarrage à `RestartSec` croissant | Réflexe obstacle de la couche 1 suffit à finir le match | 4.4, V1 |
+| Robot ↔ mât, pose | Traitée comme correction, jamais comme substitution ; source incohérente rejetée sans déplacer l'estimation | Robot continue sur odométrie seule | LOG-EXF-11, LOG-EXS-12, V13 |
+| Robot ↔ mât, couleur | Robot autorité par défaut ; sélecteur de secours sur le mât | Vision du mât dégradée si aucune couleur confirmée — voir CDC mât 9.3 | 14.5 |
+| Robot ↔ mât, hauteur de marqueur adverse | Aucun **[OUVERT]** | Non défini si jamais reçue | 16.4 #15 |
+| Robot ↔ serveur PAMI, date de départ et état du monde | Trois niveaux de repli propres aux PAMI | PAMI basculent en niveau 2 ou 3, scénario par défaut | 14.2, 14.3 |
+| Robot ↔ PAMI, position remontée (coopération) | Trois niveaux de coopération | Robot bascule sur trajectoires connues à l'avance, puis sur zone d'effacement | 14.6 |
+| Robot ↔ opérateur, télémétrie Wi-Fi | Coupée en mode match officiel ; aucun participant DDS sur le Wi-Fi | Volontairement absente en match, aucune conséquence | 4.5, 12 |
+
+Les connexions internes au mât (mât ↔ PAMI en détail, `pami-server` ↔ `vision`, mât ↔
+opérateur) sont indexées dans le CDC mât, section 9.3, sur le même principe.
+
 ---
 
 ## 14. Contrat PAMI
@@ -1794,7 +1815,8 @@ microcontrôleur Wi-Fi.
 la plateforme prévue à cet effet, sur la table. Il porte la tirette physique des PAMI,
 attribue les numéros, affiche l'état de connexion de chacun, collecte les journaux et sert
 la page de supervision. Il embarque également le point d'accès Wi-Fi. C'est la reprise d'un
-montage déjà éprouvé par le passé sur une autre équipe.
+montage déjà éprouvé par le passé sur une autre équipe. L'attribution des numéros par le
+serveur est le chemin nominal ; chaque PAMI peut aussi fixer le sien localement, voir 14.3.
 
 **C'est cette localisation qui rend l'ensemble conforme à F.6** : tous les systèmes sont sur
 la table et aucun ne communique avec l'extérieur pendant le match. Un serveur posé au stand,
@@ -1824,11 +1846,14 @@ une coupure Wi-Fi coûte tous les points des PAMI.
 |---|---|---|
 | 1 | Serveur joignable | Date de départ, plus état du monde enrichi |
 | 2 | Serveur perdu après réception de la date | Scénario minuté complet, sur horloge locale |
-| 3 | Jamais connecté | Tirette physique locale, scénario par défaut |
+| 3 | Jamais connecté | Tirette physique locale, couleur et numéro fixés par sélecteur physique, scénario par défaut |
 
-Chaque PAMI possède son propre démarreur physique. Il peut ne pas être utilisé en
-fonctionnement nominal, mais il doit exister et **le niveau 3 doit être testé**, pas
-seulement écrit.
+Chaque PAMI possède son propre démarreur physique, un sélecteur de couleur d'équipe et un
+sélecteur de numéro : de quoi jouer sans avoir jamais été connecté à quoi que ce soit.
+Aucun des trois n'est utilisé en fonctionnement nominal, mais tous doivent exister et
+**le niveau 3 doit être testé**, pas seulement écrit — c'est la même logique qui vaut pour
+tout le reste du système : chaque sous-système démarre en supposant la connectivité
+disponible, mais aucun n'en dépend pour démarrer (14.1, MAT 9.3).
 
 La liaison Wi-Fi n'apporte que l'enrichissement — quelles zones sont déjà prises, où est
 l'adversaire — jamais l'autorisation de bouger.
@@ -1859,6 +1884,18 @@ horodatage. Diffusion à 2 Hz pendant les dernières secondes avant le départ d
 Le robot principal est l'autorité sur cet état. Le chemin peut passer par le serveur — le
 saut supplémentaire coûte quelques millisecondes, négligeable à 2 Hz, et le serveur est de
 toute façon l'endroit naturel pour la supervision et les journaux.
+
+**Couleur d'équipe [ACTÉ].** Le message porte aussi la couleur active, dont le mât a besoin
+autant pour sa propre vision (MAT 4.4) que pour les PAMI. Le robot est l'autorité par
+défaut et l'émet dès qu'elle est choisie à la préparation (17.11). Si le mât ne l'a reçue
+d'aucun robot, un sélecteur de secours sur sa propre page en fixe une : elle alimente la
+vision et le canal vers les PAMI, mais n'est **jamais remontée au robot** — le mât ne fait
+que pallier une absence, pas contredire l'autorité. Dès réception d'une couleur venant du
+robot, le sélecteur s'efface et cette couleur prévaut, y compris sur une sélection de
+secours déjà diffusée aux PAMI. Le cas d'une divergence à ce stade est jugé peu probable si
+la liaison est correcte, mais il n'est pas nécessaire qu'elle le soit pour que chaque
+système démarre : c'est le même principe que 14.3 pour les PAMI et que 14.1 pour le
+serveur.
 
 ### 14.6 Évitement des PAMI par coopération [ACTÉ]
 
@@ -2021,7 +2058,8 @@ fait de tout le match.
 | 11 | Contrôle de zone interdite dans la passerelle CAN de la Pi | Logiciel | 1 mois |
 | 12 | Politique de bascule entre mode essai et mode match officiel | Logiciel | 1 mois |
 | ~~13~~ | ~~Mât : tranche colorée ou tag ArUco comme source principale~~ — **tranché** : tranche colorée, l'ArUco n'étant lisible que sur la moitié proche (CDC mât 3.2 et 3.3) | Logiciel | Clos |
-| 14 | Où se saisissent la couleur d'équipe et la hauteur de marqueur adverse : IHM du robot ou page du mât (CDC mât 10) | Logiciel | Avec la fiche 17.11 |
+| ~~14~~ | ~~Où se saisissent la couleur d'équipe et la hauteur de marqueur adverse : IHM du robot ou page du mât~~ — **tranché** : IHM du robot, transmises au mât ; garde-fou de secours sur la page du mât pour la couleur seule (14.5, CDC mât 10) | Logiciel | Clos |
+| 15 | Repli si le mât ne reçoit jamais la hauteur de marqueur adverse : valeur par défaut ou dernière connue (CDC mât 10) | Logiciel | Avec 17.11 |
 
 ---
 
@@ -2188,24 +2226,27 @@ quatre tags de table sont closes, voir le CDC mât, section 3.4.
 
 **Échéance : sans objet, à faire vivre avec le développement.**
 
-### 17.11 Procédure de préparation en trois minutes
+### 17.11 Procédure de préparation en trois minutes — rédigée
 
 **Pourquoi maintenant.** H.1 donne trois minutes pour tout installer, et le dépassement
 coûte 50 points puis un forfait en cas de récidive. Cette procédure n'est pas de
 l'intendance : elle **détermine ce que le logiciel doit automatiser**, donc elle doit être
 écrite avant de coder l'IHM et la machine à états.
 
-**À produire.** Une page, chronométrée, dans l'ordre : pose du robot, pose des PAMI, pose et
-vissage du dispositif de calcul, choix de la couleur d'équipe, saisie de la hauteur de
-marqueur adverse (10.3, lieu de saisie [OUVERT], question 14 de 16.4), choix de la stratégie, bascule en mode match officiel (12), lancement
-du recalage par contact, retour en zone de départ, passage en `PRET`, mise en place du cordon
-de tirette. Avec, en regard de chaque ligne, ce qui est manuel et ce qui est automatique.
+**État.** Rédigée, en document séparé : `docs/procedure-preparation-3min.md`. Deux
+personnes en parallèle, dans l'ordre : pose du robot, pose des PAMI, pose et vissage du
+dispositif de calcul, choix de la couleur d'équipe, saisie de la hauteur de marqueur
+adverse, choix de la stratégie, bascule en mode match officiel (12), lancement du recalage
+par contact, retour en zone de départ, passage en `PRET`, mise en place du cordon de
+tirette. Chaque ligne porte ce qui est manuel et ce qui est automatique.
 
-**Ce qu'elle va révéler.** Toute étape qui prend plus de vingt secondes doit soit être
-automatisée, soit être faite avant d'arriver sur scène. C'est le seul moyen de savoir
-maintenant quelles commandes l'IHM doit exposer en un seul geste.
+**Résultat qui remonte dans ce document :** le lieu de saisie de la couleur et de la
+hauteur (question 14 de 16.4, MAT section 10) est tranché en l'écrivant — voir 14.5.
 
-**Échéance : 2 semaines.** Elle ne dépend d'aucune autre fiche.
+**Ce qui reste ouvert.** Le repli si le mât ne reçoit jamais la hauteur de marqueur
+(question 15 de 16.4) et le mécanisme de bascule mode essai / mode match (question 12).
+
+**Échéance : sans objet, à faire vivre avec le développement.**
 
 ### 17.12 Format d'enregistrement de match
 

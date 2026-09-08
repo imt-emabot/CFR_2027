@@ -27,6 +27,12 @@ les dossiers de code n'en sont que la structure, jamais une recopie (règle 5 de
 
 ## Vérification des cahiers des charges
 
+Dépendance requise une seule fois, dans un environnement virtuel au choix :
+
+```
+pip install -r docs/cdc/requirements.txt
+```
+
 Avant et après toute modification d'un CDC :
 
 ```

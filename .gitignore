@@ -5,6 +5,7 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+.venv/
 
 # Fusion 360 fichiers temporaires
 ~$*.f3d

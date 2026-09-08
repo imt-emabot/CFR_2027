@@ -984,18 +984,37 @@ Fusion des deux caméras dans la zone de recouvrement : la détection retenue es
 l'angle hors axe est le plus faible, ce qui privilégie mécaniquement la caméra la mieux
 placée sans avoir à pondérer finement.
 
-### 9.3 Modes dégradés
+**Couleur non confirmée : `vision` ne démarre pas.** Sans couleur reçue du robot ni
+confirmée sur le sélecteur de secours (section 10), `vision` n'ouvre pas ses fenêtres de
+seuillage et n'émet aucune pose. Une pose calculée avec une couleur fausse est indiscernable
+d'une pose correcte pour le robot qui la reçoit — pire qu'aucune pose, puisque LOG-EXF-11 ne
+protège que contre une pose *incohérente*, pas contre une pose *plausible mais fausse dès
+l'origine*. Ce n'est pas une exception : c'est la même logique qui fait rejeter les
+projections hors table (9.2) et les positions extérieures incohérentes (CDC logiciel,
+LOG-EXS-12) — une absence de donnée vaut mieux qu'une donnée fausse indiscernable d'une
+bonne.
 
-| Panne | Conséquence |
-|---|---|
-| Une caméra | La moitié de table correspondante n'est plus observée, l'autre continue |
-| Les deux caméras, ou `vision` | Le mât devient un point d'accès et un serveur PAMI. Les PAMI partent, le robot joue sans correction de pose |
-| Moins de trois tags de calibration | Voir section 5 |
-| `pami-server` | Les PAMI basculent sur leur repli, niveau 2 ou 3 selon qu'ils ont reçu la date de départ |
-| Batterie | Perte totale du mât. Le robot joue son match, les PAMI partent sur tirette locale |
+### 9.3 Connexions, pannes et leurs replis
 
-**Exigence structurante, rappelée du CDC logiciel : le mât n'a aucun état persistant dont le
-robot dépend.**
+Principe tenu partout dans ce document, rappelé du CDC logiciel (13.4) : chaque sous-système
+démarre en supposant la connectivité disponible, mais aucun n'en dépend pour démarrer ou
+pour rester sûr. **Exigence structurante : le mât n'a aucun état persistant dont le robot
+dépend.**
+
+| Connexion ou panne | Garde-fou | Conséquence |
+|---|---|---|
+| Une caméra | L'autre caméra couvre sa moitié | La moitié de table correspondante n'est plus observée |
+| Les deux caméras, ou `vision` | `pami-server` continue seul (6.3) | Le mât devient un point d'accès et un serveur PAMI ; les PAMI partent, le robot joue sans correction de pose |
+| Moins de trois tags de calibration | Voir section 5 | Voir section 5 |
+| Couleur jamais confirmée (ni reçue du robot, ni sélecteur de secours utilisé) | `vision` ne démarre pas (ci-dessus) | Même conséquence que la perte de `vision` |
+| Hauteur de marqueur adverse jamais reçue | Aucun **[OUVERT]**, voir 13 point 10 | Non défini |
+| `pami-server` | PAMI ont leurs propres niveaux de repli (CDC logiciel, 14.3) | PAMI basculent en niveau 2 ou 3 selon qu'ils ont reçu la date de départ |
+| Point d'accès dédié (6.2) | Radio du calculateur en secours, si la charge processeur avec `vision` le permet | Dégradation du signal, pas de perte totale |
+| Page de supervision / opérateur | Aucun — HTTP, mode essai uniquement | Sans effet en match, la page n'est pas utilisée |
+| Batterie | Aucun | Perte totale du mât ; le robot joue son match, les PAMI partent sur tirette locale |
+
+Renvoi : les connexions côté robot (bus CAN, mât, PAMI, télémétrie) sont indexées de la même
+façon dans le CDC logiciel, section 13.4.
 
 ---
 
@@ -1005,14 +1024,20 @@ robot dépend.**
 |---|---|---|
 | Robot principal | Pose observée, confiance, horodatage | UDP unicast répété, 20 à 30 Hz |
 | Robot principal | Santé du mât, nombre de tags, état des caméras | UDP unicast, 1 Hz |
-| PAMI | Date de départ, numéro attribué, état du monde relayé | UDP unicast répété |
+| PAMI | Date de départ, numéro attribué, état du monde relayé, couleur d'équipe | UDP unicast répété |
 | Opérateur | Page de supervision, en mode essai uniquement | HTTP sur le réseau de la table |
-| Robot principal | Couleur d'équipe, hauteur de marqueur adverse | Paramétré à la préparation, dans les deux sens à décider |
 
-Le dernier point est [OUVERT] : la couleur et la hauteur de marqueur peuvent être saisies
-sur l'IHM du robot puis transmises au mât, ou saisies sur la page du mât. La première option
-évite une seconde interface à manipuler pendant les trois minutes ; la seconde évite une
-dépendance du mât au robot. À trancher avec la procédure de préparation.
+**Entrées reçues par le mât — tranché.** Couleur d'équipe et hauteur de marqueur adverse se
+saisissent sur l'IHM du robot et sont transmises au mât (même transport que ci-dessus), pas
+sur la page du mât : la séquence du mât n'admet aucune manipulation sur la table une fois
+posé (section 11), ce qu'une seconde interface à saisir y contredirait.
+
+**Garde-fou sur la couleur, pas sur la hauteur.** Si le mât n'a reçu aucune couleur d'un
+robot, sa page affiche un sélecteur de secours : la sélection alimente la vision (4.4) et le
+message vers les PAMI, mais ne remonte jamais vers le robot, qui reste l'autorité par défaut
+dès qu'il émet (CDC logiciel, 14.5). La hauteur de marqueur n'a pas ce recours : si elle
+n'est jamais reçue, aucun repli n'est défini **[OUVERT]** — à trancher, la vision tournant
+alors sur une valeur par défaut ou sur la dernière connue, ce qui n'est pas encore choisi.
 
 ---
 
@@ -1094,10 +1119,11 @@ annoncée précédemment était fausse.
 | 3 | Question à `referee@eurobot.org` sur la batterie d'outillage (8.2) | L'achat de l'adaptateur | Immédiat, la réponse prend du temps |
 | 4 | Éclairage réel de la salle, temps de pose atteignable | Le choix obturateur déroulant ou global (4.3) | Premier essai en salle |
 | 5 | Fréquence propre de la structure une fois montée | Le réglage du filtre de calibration (5) | Après montage |
-| 6 | Où se saisissent couleur d'équipe et hauteur de marqueur (10) | La procédure de préparation | Avec la fiche de préparation |
+| ~~6~~ | ~~Où se saisissent couleur d'équipe et hauteur de marqueur~~ | — | **Clos** : IHM du robot, garde-fou de secours pour la couleur seule (10) |
 | 7 | Point d'accès dédié ou radio intégrée du calculateur (6.2) | L'achat | 1 mois |
 | 8 | Port PCIe : stockage ou accélérateur neuronal (7) | Rien pour l'instant | Reportable |
 | ~~9~~ | ~~Taille et position des tags de table~~ | — | **Clos** : 100 mm, à ±900 et ±400 mm du centre (3.4) |
+| 10 | Repli si la hauteur de marqueur adverse n'est jamais reçue du robot (10) | La vision peut tourner sur une valeur fausse sans le signaler | Avec la fiche de préparation |
 
 Restent sur le chemin critique le choix de structure, qui dépend du bilan de masse et du
 capteur inertiel, et le courriel à l'arbitrage sur la source d'énergie.

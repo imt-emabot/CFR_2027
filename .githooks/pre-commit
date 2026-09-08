@@ -1,0 +1,8 @@
+#!/bin/sh
+# Installation : git config core.hooksPath .githooks
+python3 docs/cdc/verif_cdc.py || {
+  echo ""
+  echo "Commit refusé : le vérificateur des cahiers des charges signale des erreurs."
+  echo "Pour committer malgré tout : git commit --no-verify"
+  exit 1
+}

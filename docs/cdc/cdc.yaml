@@ -1,0 +1,193 @@
+date_du_jour: '2026-09-04'
+documents:
+- id: LOG
+  fichier: cdc-logiciel-robot-v1_0.md
+  titre: Logiciel embarqué du robot principal
+  categories:
+  - EXR
+  - EXF
+  - EXS
+  - EXP
+  - EXE
+  - EXD
+  - EXJ
+  essais_prefixe: V
+- id: MAT
+  fichier: cdc-mat-v0_3.md
+  titre: Dispositif de calcul et d'observation déporté
+  categories:
+  - MXR
+  - MXF
+  - MXS
+  - MXP
+  - MXE
+  - MXD
+  essais_prefixe: M
+retires:
+- id: LOG-EXP-06
+  date: '2026-09-04'
+  motif: Portait une contrainte de latence sur la boucle de navigation, rendue sans objet par le choix
+    d'un flux de waypoints remplaçable (partie II, 4.2).
+- id: LOG-EXE-08
+  date: '2026-09-04'
+  motif: Occupait un numéro d'exigence pour un simple renvoi vers la section 5.7. Réservé, non attribué.
+constantes:
+  budget_mat:
+    valeur: 415 à 610 €
+    interdits:
+    - 325–470
+    - 390 à 550
+    - 104 à 185
+    exceptions: []
+  budget_mat_ancien:
+    valeur: 415 à 610 €
+    interdits:
+    - 150 à 300 €
+    exceptions:
+    - provisionnait initialement
+  nombre_pami:
+    valeur: sept, soit six plus un
+    interdits:
+    - Les 6 PAMI
+    - Six PAMI plus un
+    exceptions: []
+  essais_degradation:
+    valeur: V1 à V6
+    interdits:
+    - quatre essais de dégradation
+    - Quatre essais obligatoires
+    exceptions: []
+  marge_masse_mat:
+    valeur: 110 g sur les 5 kg réglementaires
+    interdits:
+    - 110 mm de marge
+    exceptions: []
+  erreur_hauteur_marqueur:
+    valeur: 163 mm au coin lointain pour 80 mm d'erreur de hauteur
+    interdits:
+    - de plusieurs centimètres au coin lointain
+    exceptions: []
+  seuil_innovation:
+    valeur: 15 cm
+    interdits: []
+    exceptions: []
+  duree_match:
+    valeur: 100 secondes
+    interdits: []
+    exceptions: []
+  hauteur_utile_optique:
+    valeur: 1230 mm
+    interdits: []
+    exceptions: []
+couverture_exemptee:
+  LOG-EXF-01: Plan de vérification fonctionnel, fiche 17.13, échéance 1 mois
+  LOG-EXF-02: Idem — critère chiffré suspendu aux règles annuelles
+  LOG-EXF-03: Idem
+  LOG-EXF-04: Idem
+  LOG-EXF-05: Idem
+  LOG-EXF-07: Idem
+  LOG-EXF-08: Idem
+  LOG-EXF-10: Idem
+  LOG-EXF-12: Couverte par V8, campagne de mesure
+  LOG-EXR-02: Couverte par V5
+  LOG-EXR-05: Couverte par V6
+  LOG-EXR-06: Couverte par V6
+  LOG-EXR-07: Vérifiée par analyse des zones interdites, pas par un essai isolé
+  LOG-EXR-10: Contrôle métrologique à l'homologation, voir V7
+  LOG-EXP-02: 'Nécessite un adversaire mobile : mesuré lors des essais sur table de novembre'
+  LOG-EXP-03: Couverte par V8
+  LOG-EXP-05: Couverte par V5
+  LOG-EXP-07: Couverte par V11
+  LOG-EXE-03: Couverte par V9
+  LOG-EXE-05: Couverte par V4 et V6
+  LOG-EXE-06: Couverte par V4
+  LOG-EXD-01: Vérifiée à chaque reconstruction d'image, hors plan d'essais
+  LOG-EXS-11: Couverte par V12
+  MAT-MXF-01: Vérifiée à la première mise en service du réseau
+  MAT-MXF-02: Vérifiée avec le CDC PAMI, à la première mise en service du serveur
+  MAT-MXF-03: Couverte par M2
+  MAT-MXF-04: Couverte par M6
+  MAT-MXF-06: Couverte par M8
+  MAT-MXF-07: Couverte par M1
+  MAT-MXF-08: Couverte par M4
+  MAT-MXF-09: Couverte par M3
+  MAT-MXF-12: Couverte par M6b
+  MAT-MXS-04: Couverte par M4 et M6
+  MAT-MXE-06: Couverte par M8
+  MAT-MXD-02: Couverte par M3
+liens:
+- de: MAT-MXP-01
+  vers: LOG-EXS-12
+  motif: Le seuil d'erreur admissible du mât est fixé par le test d'innovation du robot
+  empreinte: 25ff81fb
+  valide_le: '2026-09-04'
+- de: MAT-MXF-04
+  vers: LOG-EXF-11
+  motif: La pose émise par le mât est consommée comme correction, jamais comme substitution
+  empreinte: '83556742'
+  valide_le: '2026-09-04'
+- de: MAT-MXF-05
+  vers: LOG-EXF-11
+  motif: L'indicateur de confiance est ce qui permet au robot de pondérer la correction
+  empreinte: '83556742'
+  valide_le: '2026-09-04'
+- de: MAT-MXF-12
+  vers: LOG-EXJ-04
+  motif: La base de temps commune exigée pour l'enregistrement impose la datation du mât
+  empreinte: 8c9da6eb
+  valide_le: '2026-09-04'
+- de: MAT-MXP-06
+  vers: LOG-EXF-11
+  motif: Le budget de latence conditionne l'utilisabilité de la correction de pose
+  empreinte: '83556742'
+  valide_le: '2026-09-04'
+- de: MAT-MXP-03
+  vers: LOG-EXJ-04
+  motif: Dater l'instant de mesure et non celui de la transmission
+  empreinte: 8c9da6eb
+  valide_le: '2026-09-04'
+- de: MAT-MXS-02
+  vers: LOG-EXS-03
+  motif: 'Le robot joue sans le mât : même exigence vue des deux côtés'
+  empreinte: 8187d2fd
+  valide_le: '2026-09-04'
+- de: MAT-MXS-03
+  vers: LOG-EXF-09
+  motif: Les PAMI partent sans liaison, le serveur du mât n'est pas dans la boucle
+  empreinte: 06415048
+  valide_le: '2026-09-04'
+- de: MAT-MXS-04
+  vers: LOG-EXS-12
+  motif: Une position douteuse doit être signalée côté mât et rejetée côté robot
+  empreinte: 25ff81fb
+  valide_le: '2026-09-04'
+- de: MAT-MXS-05
+  vers: LOG-EXS-07
+  motif: 'Le mât n''émet aucune commande : seule l''alimentation peut interrompre le robot'
+  empreinte: ef0d3601
+  valide_le: '2026-09-04'
+- de: MAT-MXF-03
+  vers: LOG-EXF-08
+  motif: Le départ des PAMI est une date, transmise avant leur départ
+  empreinte: 7befa7e2
+  valide_le: '2026-09-04'
+- de: MAT-MXR-06
+  vers: LOG-EXR-08
+  motif: 'Conformité F.6 : c''est la localisation du réseau sur la table qui la porte'
+  empreinte: 22a3d050
+  valide_le: '2026-09-04'
+- de: MAT-MXR-08
+  vers: LOG-EXR-11
+  motif: Le cordon de départ des PAMI est le pendant de la tirette du robot
+  empreinte: a6b8d940
+  valide_le: '2026-09-04'
+- de: MAT-MXE-01
+  vers: LOG-EXE-01
+  motif: Les trois minutes de mise en place sont un budget commun à toute l'équipe
+  empreinte: 6c7139f3
+  valide_le: '2026-09-04'
+- de: MAT-MXF-11
+  vers: LOG-EXE-01
+  motif: Les paramètres par match doivent être saisissables dans le budget de trois minutes
+  empreinte: 6c7139f3
+  valide_le: '2026-09-04'

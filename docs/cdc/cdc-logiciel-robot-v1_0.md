@@ -626,6 +626,13 @@ Diagnostic le plus probable : politique de redémarrage sans temporisation crois
 combinée à des journaux sans rotation ni quota. Un processus qui tombe et se relance dix
 fois par seconde en écrivant une trace d'erreur remplit 32 Go en quelques minutes.
 
+La relecture du dépôt de l'édition précédente corrobore ce diagnostic sans le démontrer : le
+lanceur de la branche ROS porte quatre nœuds mis en commentaire — pilote lidar, filtre de
+scan, garde-fou d'obstacle et repère de carte — sous la mention « noeuds commentés pour
+fixer le crash loop ». La boucle avait donc été constatée avant la compétition, et traitée
+en retirant des nœuds plutôt qu'en bornant les journaux et les redémarrages. Effet de bord :
+cette branche a fini sa vie sans aucun évitement.
+
 ### 2.2 Ce qu'on en retient
 
 C'est **l'exigence non fonctionnelle numéro un**. Elle structure la section 13.
@@ -1125,7 +1132,25 @@ match : le quartz dérive. À 100 ppm, l'écart accumulé sur 100 s vaut 10 ms, 
 acceptable. Et il faut **vérifier que le firmware tourne sur le HSE et non sur le HSI** :
 avec l'oscillateur interne, la dérive se compte en milliers de ppm et le décalage devient
 absurde en fin de match. C'est un piège classique de la Nucleo-32, et c'est une
-vérification de dix minutes.
+vérification de dix minutes, et elle se fait **carte alimentée par le robot, sonde de
+programmation débranchée** : sur une carte de développement, ce que le microcontrôleur voit
+comme horloge externe vient souvent de la sonde, et la bibliothèque bascule silencieusement
+sur l'oscillateur interne quand elle disparaît. Mesurer la configuration du banc revient à
+mesurer une configuration qui n'existe pas en match.
+
+Relecture du dépôt du firmware moteurs : aucune configuration d'horloge explicite n'y figure,
+ni dans le projet ni dans les options de compilation. L'hypothèse de l'oscillateur interne
+est la plus probable ; elle reste estimée.
+
+Le relevé de bus de l'édition précédente donne une borne, pas une réponse. Les périodes
+d'émission mesurées contre l'horloge de la Pi valent +1 260 ppm pour la carte moteurs et
++460 ppm pour la carte alimentation, écarts qui mélangent l'horloge, le dépassement de
+période propre au mécanisme logiciel de chaque carte et la datation à la réception. Ce qu'ils
+montrent sans ambiguïté : **les deux cartes divergent déjà d'environ 800 ppm entre elles**,
+soit quatre-vingts millisecondes sur un match. C'est huit fois le budget admis ci-dessus, et
+c'est la raison pour laquelle l'estimation continue du décalage reste nécessaire même si les
+cartes 2027 reçoivent un quartz. Le quartz, lui, coûte deux pastilles : c'est un arbitrage à
+rendre avant routage, pas après.
 
 Une synchronisation matérielle par fil dédié a été étudiée puis écartée. Voir l'annexe A.
 
@@ -1933,33 +1958,57 @@ le niveau 1 n'est pas implémenté la première année.
 
 ## 15. Comparaison avec le logiciel précédent
 
-Un rapport logiciel de l'édition précédente existe mais n'a pas encore été fourni. La
-comparaison se fera sur la grille suivante, à remplir avant de commencer à coder.
+Grille remplie le 19 septembre 2026, à partir de la sauvegarde de la Raspberry Pi de
+l'édition précédente et des dépôts des deux firmwares Nucleo. Le dépouillement complet —
+volumes, relevé du bus, défauts, plan de reprise — est dans `rapport-heritage-2026.md`, à la
+racine du dossier de documentation. Ce qui suit en est le résumé.
+
+Ce que la grille supposait et que la lecture corrige : **il n'y a pas un logiciel précédent,
+il y en a deux**. Une branche ROS 2 de onze processus en conteneur, qui n'a jamais joué un
+match et dans laquelle Nav2 n'est jamais instancié ; et une branche hors ROS d'un seul
+processus, qui a joué. Le lidar, son filtre et le garde-fou d'obstacle sont commentés dans
+le lanceur de la branche ROS, sous la mention explicite « noeuds commentés pour fixer le
+crash loop » : la boucle de redémarrage de 2.1 y avait déjà été constatée et contournée par
+suppression.
 
 | Axe | Existant | Cible | Reprendre / Refaire |
 |---|---|---|---|
-| **IHM tactile** | **Batterie, sorties, carte live, sélecteur stratégie, actions unitaires, logs** | **Idem + onglets calibration et état système** | **Reprendre** |
-| Structure des processus | | Trois couches, noyau composé en un processus | |
-| Protocole CAN | Maison | Maison + registre + passerelle ROS | |
-| Plan d'ID CAN | | Découpage en champs | Refaire |
-| Interface carte moteurs | Coordonnée unique | File de waypoints remplaçable | Refaire |
-| Acquisition codeurs | I²C ou A/B | A/B sur timer, module SPI | |
-| Horodatage odométrie | Daté à la réception par la Pi | Compteur STM32 + estimation continue du décalage | Refaire |
-| Minuterie de fin de match | Côté Pi | Côté firmware, avec rangement préalable | Refaire |
-| Recalage initial | Pendant le match | Pendant les 3 min de préparation | Refaire |
-| Mode d'exécution | Unique | Essai et match officiel | Refaire |
-| Navigation | | Nav2, planificateur seul | |
-| Évitement | | Contournement, réflexe lidar en couche 1 | |
-| Localisation | Odométrie | Odométrie + contact + mât | |
-| Stratégie | | Moteur générique + configuration | |
-| Gestion des journaux | Défaillante | Quotas, tmpfs | Refaire |
-| Politique de redémarrage | Défaillante | Temporisation croissante, par processus | Refaire |
-| Simulation | | Cinématique maison | |
-| Tests | | Dix essais de vérification, dont six de dégradation | |
+| IHM tactile | Interface web servie par la Pi, affichée en kiosque plein écran sur l'écran tactile. Six onglets, un mode match, un éditeur de stratégie. Environ 4 900 lignes. L'affichage de batterie était alimenté par une trame que la carte alimentation n'émettait pas | Idem + onglets calibration et état système | Reprendre |
+| Structure des processus | Un processus multithread pour ce qui a joué ; onze processus en conteneur pour ce qui n'a pas joué | Trois couches, noyau composé en un processus | Refaire, en gardant le découpage fonctionnel du processus unique |
+| Protocole CAN | Maison. Six opcodes descendants, deux montants. Décrit en quatre exemplaires divergents, dont l'un porte une divergence active d'unités | Maison + registre + passerelle ROS | Reprendre la sémantique, refaire la source |
+| Plan d'ID CAN | Identifiants fixes, un couple par carte, sans champ | Découpage en champs | Refaire |
+| Interface carte moteurs | Une file de seize points existe côté carte, mais la Pi n'en envoie qu'un à la fois et attend l'acquittement d'arrivée. Chaque point s'exécute en rotation, ligne droite, rotation ; aucune courbe, ni numéro de séquence, ni remplacement | File de waypoints remplaçable | Refaire la poursuite, garder la structure de file |
+| Acquisition codeurs | A/B décodé en quadrature logicielle, par interruption sur les quatre fronts. De l'ordre de 21 000 interruptions par seconde à 0,8 m/s, calculé | A/B sur timer, module SPI | Refaire |
+| Horodatage odométrie | Daté à la réception par la Pi. La trame d'odométrie transporte six octets, x, y et θ, et rien d'autre | Compteur STM32 + estimation continue du décalage | Refaire |
+| Minuterie de fin de match | Aucune, ni sur la Pi ni sur les cartes. Le décompte des cent secondes n'existe que dans le navigateur, en affichage, et n'émet rien à échéance | Côté firmware, avec rangement préalable | Refaire |
+| Chien de garde des cartes | Aucun. Sur silence de la Pi, la carte moteurs termine sa file puis reste en maintien | Freinage sur silence prolongé | Refaire |
+| Recalage initial | Séquence de contact mural écrite puis mise en commentaire. Il ne subsiste qu'un recalage de pose à l'aveugle sur des coordonnées figées | Pendant les 3 min de préparation | Refaire ; la séquence commentée reste une base |
+| Mode d'exécution | Unique, plus trois drapeaux de ligne de commande | Essai et match officiel | Refaire |
+| Navigation | Aucune. Suivi séquentiel d'une liste de points, un à la fois | Nav2, planificateur seul | Refaire |
+| Évitement | Arrêt et reprise sur cône lidar dépendant du mouvement, marge proportionnelle à la vitesse, hystérésis, filtrage par les bordures de table | Contournement, réflexe lidar en couche 1 | Reprendre la géométrie, refaire la décision |
+| Localisation | Odométrie intégrée sur la carte moteurs, plus un recalage de pose déclenché à la main et appliqué sans filtre | Odométrie + contact + mât | Reprendre, compléter |
+| Asservissement | Profil trapézoïdal et PI de vitesse par roue, gains identifiés sur la machine réelle | Idem, plus poursuite de point cible | Reprendre |
+| Stratégie | Fichier de points ordonnés, plus un registre d'actions nommées | Moteur générique + configuration | Reprendre le registre et le format, refaire le moteur |
+| Télémétrie d'alimentation | Émission en commentaire, acquisition analogique désactivée à la compilation. Aucune trame relevée sur le bus | Tension, courant, défaut par carte | Refaire |
+| Gestion des journaux | Aucune. La sortie console part dans un fichier temporaire sans quota ni rotation, et le programme n'écrit rien d'autre | Quotas, tmpfs | Refaire |
+| Politique de redémarrage | Aucune côté hors ROS : le processus tombe, tout tombe | Temporisation croissante, par processus | Refaire |
+| Simulation | Aucune. Les modes dits « simulés » journalisent la commande quand une bibliothèque manque | Cinématique maison | Refaire |
+| Tests | Un script de vérification des imports. Aucun essai de dégradation | Dix essais dont six de dégradation | Refaire |
 
 Objectif : identifier ce qui est réutilisable tel quel. **Repartir d'une page blanche sur
 du code qui a marché en compétition est un coût, pas une vertu** — l'IHM en est
-l'illustration.
+l'illustration, et l'asservissement de la carte moteurs en est la seconde.
+
+Ce que la grille donne comme ordre de grandeur : de l'ordre de 5 500 lignes réutilisables
+sur les 10 750 du système qui a joué, dont 4 900 pour la seule interface. Le reste est du
+code dont on reprend l'intention, pas le texte.
+
+*Contre-argument à conserver.* Deux lignes de la colonne « existant » décrivaient des écrans
+plutôt que des fonctions qui marchaient. La batterie affichait zéro pendant toute la
+compétition, et les journaux ne survivaient pas à l'extinction. Une grille de comparaison
+remplie depuis une interface est une grille remplie depuis ce qu'on voit, pas depuis ce qui
+fonctionne ; c'est la raison pour laquelle les enregistrements de match de LOG-EXJ-01 à
+LOG-EXJ-07 valent plus qu'un écran de diagnostic.
 
 ---
 
@@ -2050,7 +2099,7 @@ fait de tout le match.
 | 3 | Gamme de microcontrôleurs pour les cartes refaites | Électronique | Avant routage |
 | 4 | Fils ALERT et SYNC : câbler, réserver la piste, ou abandonner | Équipe | Avant routage |
 | 5 | Protection par branche du 5 V commande ; séparation des convertisseurs | Électronique | Avant routage |
-| 6 | Reprise ou réécriture de l'IHM selon sa technologie | Logiciel | 2 semaines pour la décision, voir 17.5 |
+| 6 | Où vit l'IHM : processus séparé dans le langage existant, ou affichage d'état critique réécrit dans le noyau. La technologie, elle, est tranchée — voir 17.5 | Logiciel | 2 semaines pour la décision |
 | 7 | LED de défaut mémorisée par carte | Électronique | Avant routage |
 | 8 | Capteurs de distance de secours sur carte capteur | Électronique | Avant routage |
 | 9 | Seuil entre freinage doux et freinage maximal | Logiciel | Après identification |
@@ -2132,14 +2181,20 @@ question 2 de la section 16.4.
 **Pourquoi maintenant.** C'est le plus gros morceau de code réutilisable identifié, et
 l'onglet de calibration est nécessaire à la campagne d'identification.
 
-**Question ouverte.** Sur quelle technologie l'IHM existante est-elle écrite ? Selon la
-réponse, deux voies :
+**Question de technologie : fermée.** L'IHM existante est déjà une interface web servie par
+la Pi, affichée en kiosque plein écran sur l'écran tactile et atteignable depuis un PC en
+Wi-Fi. C'est exactement la seconde voie envisagée ici, et elle est réalisée. Le couplage au
+protocole est confiné à une table déclarative côté navigateur et à la trentaine de points
+d'entrée du serveur ; le rendu, le tracé de l'aire de jeu, le mode match et l'éditeur de
+stratégie n'en connaissent rien. La voie retenue est donc **reprendre et étendre**.
 
-- Interface native déjà fonctionnelle sur l'écran → **reprendre et étendre**, en ajoutant
-  les onglets calibration et état système, et l'adaptation au nouveau protocole.
-- Technologie difficile à maintenir ou fortement couplée à l'ancien protocole →
-  **réécrire en interface web** servie par la Pi, affichée en kiosque sur l'écran et
-  accessible depuis un PC en Wi-Fi. Un seul code, deux usages.
+*Contre-argument, et il n'est pas mineur.* Le serveur existant est écrit dans un autre
+langage que le noyau (4.3), et 16.3 place l'affichage d'état critique en couche 1. Reprendre
+l'interface telle quelle ajoute donc un sixième processus, ou impose de réécrire le serveur
+et de perdre une partie du bénéfice de la reprise. Une troisième voie existe — le noyau
+publie son état, un processus d'interface le consomme et n'a aucun droit de commande pendant
+le match — mais elle n'est pas tranchée, et c'est elle, désormais, qui est l'objet de la
+question 6 de 16.4.
 
 Dans les deux cas : le rendu doit être **suspendu pendant le match**, et l'IHM appartient à
 la couche 1 pour l'affichage d'état critique, à la couche 3 pour le reste.

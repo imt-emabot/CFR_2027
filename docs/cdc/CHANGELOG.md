@@ -2,6 +2,41 @@
 
 Les modifications sont consignées ici et non dans le corps des documents.
 
+## logiciel — 19 septembre 2026
+
+Passe de confrontation à l'héritage 2026. Aucune exigence n'est créée, modifiée ni retirée ;
+toutes les modifications portent sur la partie II. Le dépouillement complet est dans
+`rapport-heritage-2026.md`.
+
+| Section | Avant | Après |
+|---|---|---|
+| 15 | Grille vide, « un rapport logiciel de l'édition précédente existe mais n'a pas encore été fourni » | Grille remplie sur lecture du code et des deux firmwares. Trois axes ajoutés : chien de garde des cartes, télémétrie d'alimentation, asservissement |
+| 15 | Implicite : un logiciel précédent | Deux branches distinctes, dont une seule a joué. Nav2 n'a jamais été instancié dans aucune des deux |
+| 2.1 | Diagnostic de la boucle de redémarrage, non corroboré | Corroboré par quatre nœuds commentés dans le lanceur sous la mention « noeuds commentés pour fixer le crash loop ». La branche ROS a fini sans évitement |
+| 7.3 | « Vérifier que le firmware tourne sur le HSE » | Aucune configuration d'horloge dans le dépôt : hypothèse de l'oscillateur interne, estimée. Mode opératoire précisé — sonde débranchée. Borne mesurée sur le relevé de bus : les deux cartes divergent d'environ 800 ppm entre elles, soit 80 ms sur un match |
+| 17.5 | Question ouverte sur la technologie de l'IHM | Fermée : interface web déjà servie par la Pi en kiosque. Voie retenue, reprendre et étendre |
+| 16.4, question 6 | « Reprise ou réécriture de l'IHM selon sa technologie » | Reformulée : où vit l'IHM, processus séparé ou affichage d'état dans le noyau |
+
+### Faits établis qui ne changent pas le texte des exigences
+
+La trame de télémétrie d'alimentation n'a jamais été émise en 2026 : l'appel est en
+commentaire et l'acquisition analogique désactivée à la compilation. Aucune trame 0x020 sur
+les 106 585 relevées au `candump`. L'affichage de batterie de l'IHM montrait zéro.
+
+L'arrêt d'urgence coupe les trois relais, 5 V compris, mais les rails de commande 5 V ne
+passent pas par un relais — vérifié sur la carte. LOG-EXS-08 est tenue, et F.4.c le tolère.
+Ce qui manque est l'autre moitié de LOG-EXS-07 : aucune détection de défaut électrique
+caractérisé, la seule cause de coupure est le bouton.
+
+Aucun chien de garde, aucune minuterie de fin de match, aucune trame de version et aucun
+code de défaut dans les deux firmwares lus.
+
+Divergence d'unités active entre la Pi et la carte moteurs sur la commande de rotation
+relative : milliradians émis, degrés relus. Illustration de LOG-EXD-02.
+
+Charge du bus mesurée en configuration 2026 : 49,8 trames par seconde en moyenne, 53 au pic
+sur une seconde, soit environ 1,3 % de la capacité retenue en 8.1.
+
 ## logiciel/v1.0 et mat/v0.3 — 4 septembre 2026
 
 Passe de mise en cohérence entre le CDC logiciel et le CDC mât, et mise en place du

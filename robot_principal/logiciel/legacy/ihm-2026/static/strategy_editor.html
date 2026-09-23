@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Éditeur de Stratégies — A'2LIN</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #09091a;
+      --surface:  #0f0f24;
+      --surface2: #16163a;
+      --surface3: #1d1d4a;
+      --border:   rgba(100,120,255,0.15);
+      --text:     #e8eaff;
+      --text-dim: #7880a0;
+      --accent:   #5b8dee;
+      --green:    #33cc77;
+      --red:      #ff4455;
+      --orange:   #ffaa00;
+      --radius:   8px;
+    }
+    body {
+      font-family: "Segoe UI", "Noto Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+
+    /* ── Top bar ─────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 1px;
+      color: var(--text);
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+    #inp-name { width: 200px; font-weight: 600; }
+    #inp-team { width: 110px; font-weight: 600; }
+    #inp-desc { flex: 1; color: var(--text-dim); }
+    #dirty-badge {
+      font-size: 11px; color: var(--orange);
+      display: none; white-space: nowrap;
+    }
+    #dirty-badge.visible { display: inline; }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    .se-layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    .sidebar {
+      width: 250px; min-width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .sidebar-header { padding: 12px 12px 8px; border-bottom: 1px solid var(--border); }
+    .sidebar-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
+    }
+    .strat-list { flex: 1; overflow-y: auto; padding: 6px; }
+    .strat-item {
+      display: flex; align-items: center;
+      padding: 8px 10px; border-radius: var(--radius);
+      cursor: pointer; gap: 6px;
+      border: 1px solid transparent; transition: all 0.15s; margin-bottom: 2px;
+    }
+    .strat-item:hover { background: var(--surface2); border-color: var(--border); }
+    .strat-item.active { background: rgba(91,141,238,0.1); border-color: rgba(91,141,238,0.35); }
+    .strat-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .strat-file { font-size: 10px; color: var(--text-dim); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .strat-btns { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+    .strat-item:hover .strat-btns { opacity: 1; }
+    .sidebar-footer {
+      padding: 8px 12px; border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-dim); line-height: 1.5;
+    }
+
+    /* ── Main ────────────────────────────────────────────── */
+    .se-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    /* ── Canvas area ─────────────────────────────────────── */
+    .canvas-area {
+      flex: 1; position: relative; overflow: hidden;
+      background: #050510; min-height: 0;
+    }
+    #arena-canvas {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      cursor: crosshair; display: block;
+    }
+    .canvas-overlay { position: absolute; pointer-events: none; }
+    #hover-coords {
+      bottom: 10px; left: 12px; font-size: 11px; color: var(--text-dim);
+      font-family: monospace; background: rgba(5,5,20,0.75);
+      padding: 3px 8px; border-radius: 4px;
+    }
+    #canvas-hint {
+      top: 10px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; color: var(--text-dim);
+      background: rgba(5,5,20,0.75); padding: 3px 10px;
+      border-radius: 4px; white-space: nowrap;
+    }
+    #total-dist {
+      top: 10px; right: 12px; font-size: 11px; color: var(--text-dim);
+      font-family: monospace; background: rgba(5,5,20,0.75);
+      padding: 3px 8px; border-radius: 4px;
+    }
+
+    /* ── Waypoint panel ──────────────────────────────────── */
+    .wp-panel {
+      height: 190px; flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      overflow-y: auto; background: var(--surface);
+    }
+    .wp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .wp-table thead {
+      position: sticky; top: 0;
+      background: var(--surface2); z-index: 1;
+    }
+    .wp-table th {
+      padding: 5px 8px; text-align: left;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text-dim);
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .wp-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(100,120,255,0.05);
+      font-family: monospace; white-space: nowrap;
+    }
+    .wp-table tr.wp-row:hover td { background: var(--surface2); cursor: pointer; }
+    .wp-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px;
+      border-radius: 50%; background: var(--accent);
+      color: #fff; font-size: 10px; font-weight: 700; font-family: sans-serif;
+    }
+    .wp-actions-cell { color: var(--text-dim); font-family: sans-serif; font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .row-btns { display: flex; gap: 2px; }
+
+    /* ── Shared button styles ────────────────────────────── */
+    .btn {
+      padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+      cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s;
+      background: var(--surface2); color: var(--text); white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface3); border-color: rgba(100,120,255,0.35); }
+    .btn-green { background: rgba(51,204,119,0.1); border-color: rgba(51,204,119,0.3); color: var(--green); }
+    .btn-green:hover { background: rgba(51,204,119,0.2); }
+    .btn-red { background: rgba(255,68,85,0.1); border-color: rgba(255,68,85,0.3); color: var(--red); }
+    .btn-red:hover { background: rgba(255,68,85,0.2); }
+    .btn-accent { background: rgba(91,141,238,0.1); border-color: rgba(91,141,238,0.3); color: var(--accent); }
+    .btn-accent:hover { background: rgba(91,141,238,0.2); }
+    .btn-mirror { background: rgba(255,170,0,0.1); border-color: rgba(255,170,0,0.3); color: var(--orange); }
+    .btn-mirror:hover { background: rgba(255,170,0,0.2); }
+    .icon-btn {
+      background: none; border: none; color: var(--text-dim);
+      cursor: pointer; padding: 2px 5px; border-radius: 4px;
+      font-size: 12px; transition: color 0.15s, background 0.15s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--surface3); }
+    .icon-btn.danger:hover { color: var(--red); }
+
+    /* ── Modal ────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; backdrop-filter: blur(3px);
+    }
+    .modal-overlay.hidden { display: none !important; }
+    .modal-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; width: 580px;
+      max-width: 96vw; max-height: 88vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.65);
+    }
+    .modal-panel.sm { width: 380px; }
+    .modal-header {
+      padding: 13px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-title { font-weight: 700; font-size: 14px; }
+    .modal-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+    .modal-footer {
+      padding: 11px 18px; border-top: 1px solid var(--border);
+      display: flex; gap: 7px; align-items: center; flex-shrink: 0;
+    }
+    .modal-spacer { flex: 1; }
+
+    /* ── Form ────────────────────────────────────────────── */
+    .form-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group.flex1 { flex: 1; min-width: 80px; }
+    .form-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); }
+    .form-input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 9px;
+      font-size: 13px; outline: none; transition: border-color 0.15s; font-family: monospace;
+    }
+    .form-input.sans { font-family: inherit; }
+    .form-input:focus { border-color: var(--accent); }
+    .form-select {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 9px;
+      font-size: 13px; outline: none; cursor: pointer;
+    }
+    .cb-row { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px; }
+    .cb-row input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+
+    /* ── Modal sections ──────────────────────────────────── */
+    .msec { margin-bottom: 16px; }
+    .msec-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 9px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Theta wheel ─────────────────────────────────────── */
+    .theta-row { display: flex; gap: 14px; align-items: center; }
+    #theta-wheel { border-radius: 50%; border: 1px solid var(--border); cursor: crosshair; flex-shrink: 0; }
+
+    /* ── Actions ─────────────────────────────────────────── */
+    .act-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
+    .act-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 10px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .act-item-header {
+      display: flex; align-items: center; gap: 7px;
+    }
+    .act-label { flex: 1; font-size: 12px; font-weight: 600; }
+    .act-timing-sel {
+      background: var(--surface3); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text);
+      padding: 2px 5px; font-size: 11px; cursor: pointer; outline: none;
+    }
+    .act-params-row {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 7px; padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .act-param-g { display: flex; flex-direction: column; gap: 3px; }
+    .act-param-g label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .act-param-g input, .act-param-g select {
+      background: var(--surface3); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text);
+      padding: 4px 7px; font-size: 12px; width: 100px;
+      font-family: monospace; outline: none;
+    }
+    .act-param-g input:focus { border-color: var(--accent); }
+
+    /* Add action row */
+    .act-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .act-add-params {
+      margin-top: 9px; padding: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px;
+    }
+
+    /* ── Misc ─────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,120,255,0.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100,120,255,0.4); }
+    .se-input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 5px 9px;
+      font-size: 13px; outline: none; transition: border-color 0.15s;
+    }
+    .se-input:focus { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/><circle cx="12" cy="12" r="3"/></svg>
+    ÉDITEUR DE STRATÉGIES
+  </div>
+  <input id="inp-name" class="se-input" placeholder="Nom de la stratégie" style="width:200px;font-weight:600">
+  <select id="inp-team" class="form-select" title="Équipe de la stratégie">
+    <option value="blue">BLEU</option>
+    <option value="yellow">JAUNE</option>
+  </select>
+  <input id="inp-desc" class="se-input" placeholder="Description (optionnel)" style="flex:1">
+  <span id="dirty-badge">● non sauvegardé</span>
+  <button class="btn btn-mirror" onclick="mirrorStrategy()" title="Transposer bleu ↔ jaune (miroir sur l'axe X)">⟺ Miroir</button>
+  <button class="btn btn-green" onclick="saveStrategy()">💾 Sauvegarder</button>
+  <button class="btn btn-accent" onclick="exportJSON()">⬇ Exporter JSON</button>
+  <label class="btn btn-accent" style="cursor:pointer">
+    ⬆ Importer JSON
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importJSON(event)">
+  </label>
+  <a href="/" class="btn" style="text-decoration:none">← IHM</a>
+</div>
+
+<div class="se-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Stratégies enregistrées</div>
+      <button class="btn btn-green" style="width:100%" onclick="newStrategy()">+ Nouvelle stratégie</button>
+    </div>
+    <div class="strat-list" id="strat-list">
+      <div style="padding:20px 12px;color:var(--text-dim);font-size:12px;text-align:center">Chargement…</div>
+    </div>
+    <div class="sidebar-footer" id="sidebar-info">—</div>
+  </aside>
+
+  <!-- ── Main area ── -->
+  <div class="se-main">
+    <div class="canvas-area" id="canvas-area">
+      <canvas id="arena-canvas"></canvas>
+      <div class="canvas-overlay" id="hover-coords">x=—  y=—</div>
+      <div class="canvas-overlay" id="canvas-hint">Clic = ajouter waypoint &nbsp;·&nbsp; Glisser = déplacer &nbsp;·&nbsp; Clic droit = supprimer</div>
+      <div class="canvas-overlay" id="total-dist">—</div>
+    </div>
+
+    <div class="wp-panel">
+      <table class="wp-table">
+        <thead>
+          <tr>
+            <th>#</th><th>X (m)</th><th>Y (m)</th><th>θ (°)</th>
+            <th>Hold</th><th>Ign.θ</th><th>Vit.%</th><th>Actions</th>
+            <th style="width:90px"></th>
+          </tr>
+        </thead>
+        <tbody id="wp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Waypoint modal ── -->
+<div id="wp-modal" class="modal-overlay hidden">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Waypoint #1</span>
+      <button class="icon-btn" style="font-size:15px" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Position -->
+      <div class="msec">
+        <div class="msec-title">Position sur le terrain</div>
+        <div class="form-row">
+          <div class="form-group flex1">
+            <div class="form-label">X (mètres)</div>
+            <input id="m-x" class="form-input" type="number" step="0.005" min="0" max="3" placeholder="0.000">
+          </div>
+          <div class="form-group flex1">
+            <div class="form-label">Y (mètres)</div>
+            <input id="m-y" class="form-input" type="number" step="0.005" min="0" max="2" placeholder="0.000">
+          </div>
+        </div>
+        <div class="theta-row">
+          <div class="form-group flex1">
+            <div class="form-label">θ — angle (degrés) — cliquez sur la roue</div>
+            <input id="m-theta-deg" class="form-input" type="number" step="5" min="-360" max="360" placeholder="0" oninput="onThetaInput()">
+          </div>
+          <canvas id="theta-wheel" width="72" height="72" title="Cliquez pour choisir la direction"></canvas>
+        </div>
+      </div>
+
+      <!-- Navigation options -->
+      <div class="msec">
+        <div class="msec-title">Options de navigation</div>
+        <div class="form-row" style="gap:20px;margin-bottom:10px">
+          <label class="cb-row"><input type="checkbox" id="m-hold"> Attendre l'arrivée (hold)</label>
+          <label class="cb-row"><input type="checkbox" id="m-ignore-theta"> Ignorer l'angle (ignore_theta)</label>
+        </div>
+        <div class="form-group" style="display:inline-flex">
+          <div class="form-label">Limite de vitesse (%)</div>
+          <input id="m-speed" class="form-input" type="number" step="5" min="10" max="100" style="width:90px">
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="msec">
+        <div class="msec-title">Actions au waypoint</div>
+        <div class="act-list" id="act-list"></div>
+        <div class="act-add-row">
+          <select id="act-type-sel" class="form-select" style="flex:1;min-width:160px" onchange="renderAddParams()">
+            <option value="">— Choisir une action à ajouter —</option>
+          </select>
+          <select id="act-timing-sel" class="form-select" style="width:80px">
+            <option value="before">Avant</option>
+            <option value="after" selected>Après</option>
+          </select>
+          <button class="btn btn-accent" onclick="addAction()">+ Ajouter</button>
+        </div>
+        <div id="act-add-params" class="act-add-params hidden"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-red" onclick="deleteWpModal()">🗑 Supprimer</button>
+      <button class="btn" onclick="moveWpUp()">↑ Monter</button>
+      <button class="btn" onclick="moveWpDown()">↓ Descendre</button>
+      <div class="modal-spacer"></div>
+      <button class="btn btn-green" onclick="closeModal()">✓ Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Rename modal ── -->
+<div id="rename-modal" class="modal-overlay hidden">
+  <div class="modal-panel sm">
+    <div class="modal-header">
+      <span class="modal-title" id="rename-title">Renommer</span>
+      <button class="icon-btn" style="font-size:15px" onclick="closeRename()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div class="form-group">
+        <div class="form-label">Nouveau nom</div>
+        <input id="rename-inp" class="form-input sans" style="width:100%" placeholder="Nom de la stratégie"
+               onkeydown="if(event.key==='Enter')confirmRename()">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-spacer"></div>
+      <button class="btn" onclick="closeRename()">Annuler</button>
+      <button class="btn btn-green" onclick="confirmRename()">Renommer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  Constants
+// ═══════════════════════════════════════════════════════════════════
+const ARENA_W = 3.0, ARENA_H = 2.0;
+const WP_R = 13;
+
+// ─── Action definitions ───────────────────────────────────────────
+// Internal key → { label, runnerName?, params[] }
+// runnerName: only if different from the key (e.g. push_wall_custom → push_wall)
+// params[].toRad: true if UI is in degrees but runner expects radians
+const ACTION_DEFS = {
+  // Registered actions (no params) ─────────────────────────────────
+  arm_init:        { label: '🦾 Bras — Position repli',     params: [] },
+  arm_deploy:      { label: '🦾 Bras — Déployer',           params: [] },
+  grab_element:    { label: '🤚 Bras — Saisir élément',     params: [] },
+  release_element: { label: '🫳 Bras — Relâcher élément',   params: [] },
+  thermo_open:     { label: '🌡 Thermo — Ouvrir',           params: [] },
+  thermo_close:    { label: '🌡 Thermo — Fermer',           params: [] },
+  servo_init:      { label: '🔧 Servos — Init',             params: [] },
+  push_wall:       { label: '🧱 Pousser mur (preset)',       params: [] },
+
+  // Ad-hoc actions with params ──────────────────────────────────────
+  line_add: {
+    label: '➡ Avance relative (m)',
+    params: [
+      { key: 'dist',  label: 'Distance (m)', type: 'number', min: -3,   max: 3,   def: 0.2,  step: 0.01 },
+      { key: 'speed', label: 'Vitesse m/s',  type: 'number', min: 0.05, max: 1.5, def: 0.3,  step: 0.05 },
+    ],
+  },
+  turn_add: {
+    label: '↩ Rotation relative',
+    params: [
+      { key: 'angle_deg', label: 'Angle (°)',      type: 'number', min: -360, max: 360, def: 90,  step: 5,    toRad: true },
+      { key: 'speed',     label: 'Vitesse rad/s',  type: 'number', min: 0.05, max: 3.0, def: 0.2, step: 0.05 },
+    ],
+  },
+  push_wall_custom: {
+    label: '🧱 Pousser mur (paramétré)',
+    runnerName: 'push_wall',
+    params: [
+      { key: 'pwm', label: 'PWM (%)',    type: 'number', min: -100, max: 100, def: 40,  step: 5   },
+      { key: 'dur', label: 'Durée (s)', type: 'number', min: 0.1,  max: 30,  def: 1.0, step: 0.1 },
+    ],
+  },
+  set_pose: {
+    label: '📍 Réinitialiser pose',
+    params: [
+      { key: 'x',         label: 'X (m)', type: 'number', min: 0,    max: 3,   def: 0, step: 0.01 },
+      { key: 'y',         label: 'Y (m)', type: 'number', min: 0,    max: 2,   def: 0, step: 0.01 },
+      { key: 'theta_deg', label: 'θ (°)', type: 'number', min: -360, max: 360, def: 0, step: 5,   toRad: true },
+    ],
+  },
+  servos: {
+    label: '🔧 Servos directs',
+    params: [
+      { key: 's0', label: 'Servo 0 (°)', type: 'number', min: 0, max: 180, def: 90, step: 5 },
+      { key: 's1', label: 'Servo 1 (°)', type: 'number', min: 0, max: 180, def: 90, step: 5 },
+      { key: 's2', label: 'Servo 2 (°)', type: 'number', min: 0, max: 180, def: 90, step: 5 },
+    ],
+  },
+  stepper: {
+    label: '⚙ Stepper (pas)',
+    params: [
+      { key: 'steps', label: 'Pas', type: 'number', min: -10000, max: 10000, def: 200, step: 50 },
+    ],
+  },
+  sleep: {
+    label: '⏳ Attendre',
+    params: [
+      { key: 'seconds', label: 'Durée (s)', type: 'number', min: 0, max: 30, def: 0.5, step: 0.1 },
+    ],
+  },
+};
+
+// Maps runner name (before colon) → defKey  (for parsing loaded JSON)
+const RUNNER_TO_DEF = {
+  arm_init:        'arm_init',
+  init:            'arm_init',
+  deploy:          'arm_deploy',
+  store:           'arm_init',
+  arm_deploy:      'arm_deploy',
+  grab_element:    'grab_element',
+  arm_grab:        'grab_element',
+  release_element: 'release_element',
+  arm_release:     'release_element',
+  thermo_open:     'thermo_open',
+  thermo_close:    'thermo_close',
+  servo_init:      'servo_init',
+  line_add:        'line_add',
+  turn_add:        'turn_add',
+  set_pose:        'set_pose',
+  servos:          'servos',
+  stepper:         'stepper',
+  sleep:           'sleep',
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  Action serialization / parsing
+// ═══════════════════════════════════════════════════════════════════
+
+// Convert internal action object → JSON format { name, timing }
+function serializeAction(act) {
+  const def = ACTION_DEFS[act.defKey];
+  if (!def) return { name: act.defKey || '', timing: act.timing || 'after' };
+
+  const runnerName = def.runnerName || act.defKey;
+  let name;
+  if (def.params.length > 0) {
+    const vals = def.params.map(p => {
+      let v = (act.params && act.params[p.key] !== undefined) ? act.params[p.key] : p.def;
+      if (p.toRad) v = parseFloat((parseFloat(v) * Math.PI / 180).toFixed(6));
+      return String(v);
+    });
+    name = runnerName + ':' + vals.join(',');
+  } else {
+    name = runnerName;
+  }
+  return { name, timing: act.timing || 'after' };
+}
+
+// Parse JSON action entry → internal format { defKey, params, timing }
+function parseAction(jsonAct) {
+  let nameStr, timing;
+  if (typeof jsonAct === 'string') {
+    nameStr = jsonAct; timing = 'after';
+  } else if (jsonAct && jsonAct.name) {
+    nameStr = jsonAct.name; timing = jsonAct.timing || 'after';
+  } else if (jsonAct && jsonAct.type) {
+    // Legacy old-editor format { type: 'arm_grab', ... }
+    nameStr = jsonAct.type; timing = jsonAct.timing || 'after';
+  } else {
+    return null;
+  }
+  if (!nameStr) return null;
+
+  let defKey, params = {};
+
+  if (nameStr.includes(':')) {
+    const ci = nameStr.indexOf(':');
+    const base = nameStr.substring(0, ci);
+    const arg  = nameStr.substring(ci + 1);
+
+    if (base === 'push_wall') {
+      defKey = 'push_wall_custom';
+      const parts = arg.split(',');
+      params = { pwm: parseFloat(parts[0] ?? 40), dur: parseFloat(parts[1] ?? 1.0) };
+    } else {
+      defKey = RUNNER_TO_DEF[base] || base;
+      const def = ACTION_DEFS[defKey];
+      if (def && def.params.length > 0) {
+        const vals = arg.split(',');
+        def.params.forEach((p, i) => {
+          let v = vals[i] !== undefined ? parseFloat(vals[i]) : p.def;
+          if (p.toRad) v = parseFloat((v * 180 / Math.PI).toFixed(2));
+          params[p.key] = isNaN(v) ? p.def : v;
+        });
+      }
+    }
+  } else {
+    // Simple registered name or unknown
+    if (nameStr === 'push_wall') {
+      defKey = 'push_wall'; // registered preset, no params
+    } else {
+      defKey = RUNNER_TO_DEF[nameStr] || nameStr;
+    }
+  }
+
+  return { defKey, params, timing };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════
+let strat = { name: '', description: '', team: 'blue', version: 1, waypoints: [] };
+let stratFile = '';
+let nextId    = 1;
+let editIdx   = -1;
+let dirty     = false;
+let dragState = null;
+let cvLayout  = { scale: 1 };
+let arenaImg = null, arenaImgLoaded = false;
+
+function normalizeTeam(team) {
+  const t = String(team || '').trim().toLowerCase();
+  if (t === 'blue' || t === 'bleu') return 'blue';
+  if (t === 'yellow' || t === 'jaune') return 'yellow';
+  return 'blue';
+}
+
+function syncTeamUI() {
+  const el = document.getElementById('inp-team');
+  if (el) el.value = normalizeTeam(strat.team);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  arenaImg = new Image();
+  arenaImg.onload  = () => { arenaImgLoaded = true; drawCanvas(); };
+  arenaImg.onerror = () => { arenaImgLoaded = false; drawCanvas(); };
+  arenaImg.src = '/static/arena.png';
+
+  // Populate action type selector
+  const sel = document.getElementById('act-type-sel');
+  // Group: registered actions
+  const grp1 = document.createElement('optgroup');
+  grp1.label = '── Actions enregistrées';
+  const grp2 = document.createElement('optgroup');
+  grp2.label = '── Actions avec paramètres';
+  for (const [id, def] of Object.entries(ACTION_DEFS)) {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = def.label;
+    (def.params.length === 0 ? grp1 : grp2).appendChild(o);
+  }
+  sel.appendChild(grp1);
+  sel.appendChild(grp2);
+
+  const area   = document.getElementById('canvas-area');
+  const canvas = document.getElementById('arena-canvas');
+  const ro = new ResizeObserver(() => resizeCanvas());
+  ro.observe(area);
+  resizeCanvas();
+
+  canvas.addEventListener('mousedown',  onMD);
+  canvas.addEventListener('mousemove',  onMM);
+  canvas.addEventListener('mouseup',    onMU);
+  canvas.addEventListener('mouseleave', () => {
+    document.getElementById('hover-coords').textContent = 'x=—  y=—';
+    dragState = null;
+  });
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const { x, y } = c2a(e);
+    const i = nearestWp(x, y);
+    if (i >= 0 && confirm(`Supprimer le waypoint #${i+1} ?`)) deleteWpIdx(i);
+  });
+
+  document.getElementById('inp-name').addEventListener('input', () => setDirty(true));
+  document.getElementById('inp-team').addEventListener('change', () => {
+    strat.team = normalizeTeam(document.getElementById('inp-team').value);
+    setDirty(true);
+  });
+  document.getElementById('inp-desc').addEventListener('input', () => setDirty(true));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeModal(); closeRename(); }
+  });
+
+  loadStratList();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  Canvas resize & layout
+// ═══════════════════════════════════════════════════════════════════
+function resizeCanvas() {
+  const area   = document.getElementById('canvas-area');
+  const canvas = document.getElementById('arena-canvas');
+  const r = area.getBoundingClientRect();
+  const scale = Math.min(r.width / ARENA_W, r.height / ARENA_H) * 0.92;
+  canvas.width  = Math.round(ARENA_W * scale);
+  canvas.height = Math.round(ARENA_H * scale);
+  cvLayout.scale = scale;
+  drawCanvas();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Coordinate helpers
+// ═══════════════════════════════════════════════════════════════════
+function c2a(e) {
+  const r = e.target.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  const s = cvLayout.scale;
+  return {
+    x: Math.max(0, Math.min(ARENA_W, cx / s)),
+    y: Math.max(0, Math.min(ARENA_H, ARENA_H - cy / s)),
+  };
+}
+function a2c(ax, ay) {
+  const s = cvLayout.scale;
+  return { cx: ax * s, cy: (ARENA_H - ay) * s };
+}
+function nearestWp(ax, ay) {
+  const tol = (WP_R + 6) / cvLayout.scale;
+  for (let i = strat.waypoints.length - 1; i >= 0; i--) {
+    const w = strat.waypoints[i];
+    if (Math.hypot(w.x - ax, w.y - ay) < tol) return i;
+  }
+  return -1;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Draw arena canvas
+// ═══════════════════════════════════════════════════════════════════
+function drawCanvas() {
+  const canvas = document.getElementById('arena-canvas');
+  if (!canvas.width || !canvas.height) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const s = cvLayout.scale;
+
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, W, H);
+
+  if (arenaImgLoaded) {
+    ctx.drawImage(arenaImg, 0, 0, W, H);
+  } else {
+    ctx.strokeStyle = 'rgba(80,100,200,0.12)'; ctx.lineWidth = 0.5;
+    for (let gx = 0; gx <= ARENA_W; gx += 0.25) { const p = gx*s; ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,H); ctx.stroke(); }
+    for (let gy = 0; gy <= ARENA_H; gy += 0.25) { const p = gy*s; ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(W,p); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(80,100,200,0.35)'; ctx.lineWidth = 1;
+    for (let gx = 0; gx <= ARENA_W; gx += 0.5) { const p = gx*s; ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,H); ctx.stroke(); }
+    for (let gy = 0; gy <= ARENA_H; gy += 0.5) { const p = gy*s; ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(W,p); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(80,100,200,0.8)'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W-2, H-2);
+    ctx.fillStyle = 'rgba(120,140,240,0.5)'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('0', 4, H-4);
+    ctx.fillText('x=3.0m', W-50, H-4);
+    ctx.fillText('y=2.0m', 4, 14);
+  }
+
+  const wps = strat.waypoints;
+  if (wps.length === 0) {
+    document.getElementById('total-dist').textContent = 'distance: —';
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(91,141,238,0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  let dist = 0;
+  wps.forEach((w, i) => {
+    const { cx, cy } = a2c(w.x, w.y);
+    if (i === 0) ctx.moveTo(cx, cy);
+    else { ctx.lineTo(cx, cy); dist += Math.hypot(w.x - wps[i-1].x, w.y - wps[i-1].y); }
+  });
+  ctx.stroke();
+  ctx.restore();
+  document.getElementById('total-dist').textContent = `dist. totale: ${dist.toFixed(2)} m`;
+
+  wps.forEach((w, i) => {
+    const { cx, cy } = a2c(w.x, w.y);
+    const isActive = i === editIdx;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-w.theta);
+    ctx.strokeStyle = isActive ? '#ffe455' : 'rgba(255,228,50,0.65)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(WP_R + 9, 0); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(WP_R + 9, 0); ctx.lineTo(WP_R + 4, -4);
+    ctx.moveTo(WP_R + 9, 0); ctx.lineTo(WP_R + 4,  4);
+    ctx.stroke();
+    ctx.restore();
+
+    const hasActs = w.actions && w.actions.length > 0;
+    ctx.beginPath();
+    ctx.arc(cx, cy, WP_R, 0, Math.PI * 2);
+    if (isActive)        { ctx.fillStyle = 'rgba(255,228,50,0.2)';   ctx.strokeStyle = '#ffe455'; }
+    else if (hasActs)    { ctx.fillStyle = 'rgba(255,170,0,0.15)';  ctx.strokeStyle = '#ffaa00'; }
+    else                 { ctx.fillStyle = 'rgba(91,141,238,0.15)'; ctx.strokeStyle = '#5b8dee'; }
+    ctx.lineWidth = 2;
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = isActive ? '#ffe455' : '#ffffff';
+    ctx.font = `bold ${WP_R - 2}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i + 1, cx, cy);
+
+    if (w.hold) {
+      ctx.beginPath();
+      ctx.arc(cx, cy + WP_R + 5, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#33cc77';
+      ctx.fill();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Canvas mouse events
+// ═══════════════════════════════════════════════════════════════════
+function onMD(e) {
+  if (e.button !== 0) return;
+  const { x, y } = c2a(e);
+  const i = nearestWp(x, y);
+  dragState = i >= 0 ? { idx: i, moved: false, sx: x, sy: y } : null;
+}
+function onMM(e) {
+  const { x, y } = c2a(e);
+  document.getElementById('hover-coords').textContent = `x=${x.toFixed(3)}  y=${y.toFixed(3)}`;
+  const canvas = document.getElementById('arena-canvas');
+  if (dragState) {
+    if (!dragState.moved && (Math.abs(x - dragState.sx) > 0.004 || Math.abs(y - dragState.sy) > 0.004))
+      dragState.moved = true;
+    if (dragState.moved) {
+      const w = strat.waypoints[dragState.idx];
+      w.x = Math.max(0, Math.min(ARENA_W, parseFloat(x.toFixed(3))));
+      w.y = Math.max(0, Math.min(ARENA_H, parseFloat(y.toFixed(3))));
+      setDirty(true); drawCanvas(); refreshTable();
+      canvas.style.cursor = 'grabbing'; return;
+    }
+  }
+  canvas.style.cursor = nearestWp(x, y) >= 0 ? 'grab' : 'crosshair';
+}
+function onMU(e) {
+  if (e.button !== 0) { dragState = null; return; }
+  const { x, y } = c2a(e);
+  if (dragState && dragState.moved) { dragState = null; return; }
+  const clickedIdx = dragState ? dragState.idx : nearestWp(x, y);
+  dragState = null;
+
+  if (clickedIdx >= 0) {
+    openModal(clickedIdx);
+  } else {
+    const w = {
+      id: nextId++,
+      x: parseFloat(x.toFixed(3)), y: parseFloat(y.toFixed(3)),
+      theta: 0, hold: true, ignore_theta: false,
+      speed_limit_pct: 100, actions: [],
+    };
+    strat.waypoints.push(w);
+    setDirty(true); drawCanvas(); refreshTable();
+    openModal(strat.waypoints.length - 1);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Waypoint table
+// ═══════════════════════════════════════════════════════════════════
+function refreshTable() {
+  const tbody = document.getElementById('wp-tbody');
+  tbody.innerHTML = '';
+  strat.waypoints.forEach((w, i) => {
+    const tDeg = (w.theta * 180 / Math.PI).toFixed(1);
+    const actTxt = (w.actions || []).map(a => {
+      const def = ACTION_DEFS[a.defKey];
+      const short = def?.label?.replace(/^[^\s]+\s*/, '') || a.defKey || '?';
+      return short + (a.timing === 'before' ? '↑' : '↓');
+    }).join(', ') || '—';
+
+    const tr = document.createElement('tr');
+    tr.className = 'wp-row';
+    tr.innerHTML = `
+      <td><span class="wp-num">${i+1}</span></td>
+      <td>${w.x.toFixed(3)}</td>
+      <td>${w.y.toFixed(3)}</td>
+      <td>${tDeg}°</td>
+      <td>${w.hold ? '✓' : ''}</td>
+      <td>${w.ignore_theta ? '✓' : ''}</td>
+      <td>${w.speed_limit_pct ?? 100}%</td>
+      <td class="wp-actions-cell">${esc(actTxt)}</td>
+      <td>
+        <div class="row-btns">
+          <button class="icon-btn" title="Monter"     data-up="${i}">↑</button>
+          <button class="icon-btn" title="Descendre"  data-down="${i}">↓</button>
+          <button class="icon-btn danger" title="Supprimer" data-del="${i}">🗑</button>
+        </div>
+      </td>`;
+    tr.querySelectorAll('td:not(:last-child)').forEach(td =>
+      td.addEventListener('click', () => openModal(i)));
+    tr.querySelector('[data-up]').addEventListener('click',  (e) => { e.stopPropagation(); moveWpIdxUp(i); });
+    tr.querySelector('[data-down]').addEventListener('click',(e) => { e.stopPropagation(); moveWpIdxDown(i); });
+    tr.querySelector('[data-del]').addEventListener('click', (e) => { e.stopPropagation(); deleteWpIdx(i); });
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('sidebar-info').textContent =
+    stratFile
+      ? `${stratFile}\n${strat.waypoints.length} waypoint(s)`
+      : `${strat.waypoints.length} waypoint(s) — non enregistré`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Waypoint CRUD
+// ═══════════════════════════════════════════════════════════════════
+function deleteWpIdx(i) {
+  strat.waypoints.splice(i, 1);
+  if (editIdx === i) editIdx = -1;
+  else if (editIdx > i) editIdx--;
+  setDirty(true); drawCanvas(); refreshTable();
+}
+function moveWpIdxUp(i) {
+  if (i === 0) return;
+  [strat.waypoints[i-1], strat.waypoints[i]] = [strat.waypoints[i], strat.waypoints[i-1]];
+  if (editIdx === i) editIdx = i-1;
+  else if (editIdx === i-1) editIdx = i;
+  setDirty(true); drawCanvas(); refreshTable();
+}
+function moveWpIdxDown(i) {
+  if (i >= strat.waypoints.length - 1) return;
+  [strat.waypoints[i], strat.waypoints[i+1]] = [strat.waypoints[i+1], strat.waypoints[i]];
+  if (editIdx === i) editIdx = i+1;
+  else if (editIdx === i+1) editIdx = i;
+  setDirty(true); drawCanvas(); refreshTable();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Modal open / close / save
+// ═══════════════════════════════════════════════════════════════════
+function openModal(idx) {
+  editIdx = idx;
+  const w = strat.waypoints[idx];
+  document.getElementById('modal-title').textContent = `Waypoint #${idx + 1}`;
+  document.getElementById('m-x').value = w.x.toFixed(3);
+  document.getElementById('m-y').value = w.y.toFixed(3);
+  document.getElementById('m-theta-deg').value = Math.round(w.theta * 180 / Math.PI);
+  document.getElementById('m-hold').checked = w.hold ?? true;
+  document.getElementById('m-ignore-theta').checked = w.ignore_theta ?? false;
+  document.getElementById('m-speed').value = w.speed_limit_pct ?? 100;
+  renderActList();
+  drawThetaWheel(w.theta);
+  drawCanvas();
+  document.getElementById('wp-modal').classList.remove('hidden');
+  document.getElementById('m-x').focus();
+}
+function closeModal() {
+  if (editIdx >= 0) flushModal();
+  editIdx = -1;
+  document.getElementById('wp-modal').classList.add('hidden');
+  drawCanvas(); refreshTable();
+}
+function flushModal() {
+  if (editIdx < 0 || editIdx >= strat.waypoints.length) return;
+  const w = strat.waypoints[editIdx];
+  const xv = parseFloat(document.getElementById('m-x').value);
+  const yv = parseFloat(document.getElementById('m-y').value);
+  const td = parseFloat(document.getElementById('m-theta-deg').value) || 0;
+  if (!isNaN(xv)) w.x = Math.max(0, Math.min(ARENA_W, parseFloat(xv.toFixed(3))));
+  if (!isNaN(yv)) w.y = Math.max(0, Math.min(ARENA_H, parseFloat(yv.toFixed(3))));
+  w.theta = parseFloat((td * Math.PI / 180).toFixed(5));
+  w.hold = document.getElementById('m-hold').checked;
+  w.ignore_theta = document.getElementById('m-ignore-theta').checked;
+  w.speed_limit_pct = parseInt(document.getElementById('m-speed').value) || 100;
+  setDirty(true);
+}
+function deleteWpModal() {
+  const i = editIdx;
+  document.getElementById('wp-modal').classList.add('hidden');
+  editIdx = -1;
+  deleteWpIdx(i);
+}
+function moveWpUp() {
+  flushModal();
+  const i = editIdx;
+  if (i <= 0) return;
+  moveWpIdxUp(i);
+  editIdx = i - 1;
+  document.getElementById('modal-title').textContent = `Waypoint #${editIdx + 1}`;
+}
+function moveWpDown() {
+  flushModal();
+  const i = editIdx;
+  if (i >= strat.waypoints.length - 1) return;
+  moveWpIdxDown(i);
+  editIdx = i + 1;
+  document.getElementById('modal-title').textContent = `Waypoint #${editIdx + 1}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Theta wheel
+// ═══════════════════════════════════════════════════════════════════
+function drawThetaWheel(rad) {
+  const c = document.getElementById('theta-wheel');
+  const ctx = c.getContext('2d');
+  const cx = c.width/2, cy = c.height/2, r = 28;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(91,141,238,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+  for (let a = 0; a < Math.PI*2; a += Math.PI/4) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.strokeStyle = 'rgba(91,141,238,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(r-5, 0); ctx.lineTo(r, 0); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(-rad);
+  ctx.strokeStyle = '#ffe455'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r - 2, 0); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(r-2, 0); ctx.lineTo(r-7, -4);
+  ctx.moveTo(r-2, 0); ctx.lineTo(r-7,  4);
+  ctx.stroke(); ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2);
+  ctx.fillStyle = '#5b8dee'; ctx.fill();
+}
+document.getElementById('theta-wheel').addEventListener('click', (e) => {
+  const c = e.target;
+  const rect = c.getBoundingClientRect();
+  const dx = e.clientX - rect.left - c.width/2;
+  const dy = e.clientY - rect.top  - c.height/2;
+  const angle = Math.atan2(-dy, dx);
+  document.getElementById('m-theta-deg').value = Math.round(angle * 180 / Math.PI);
+  drawThetaWheel(angle);
+});
+function onThetaInput() {
+  const deg = parseFloat(document.getElementById('m-theta-deg').value) || 0;
+  drawThetaWheel(deg * Math.PI / 180);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Actions in modal
+// ═══════════════════════════════════════════════════════════════════
+function renderActList() {
+  if (editIdx < 0) return;
+  const w = strat.waypoints[editIdx];
+  const list = document.getElementById('act-list');
+  list.innerHTML = '';
+
+  (w.actions || []).forEach((act, i) => {
+    const def = ACTION_DEFS[act.defKey];
+    const lbl = def ? def.label : (act.defKey || '?');
+
+    const div = document.createElement('div');
+    div.className = 'act-item';
+
+    // ── Header row ─────────────────────────────────────────────────
+    const header = document.createElement('div');
+    header.className = 'act-item-header';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'act-label';
+    labelEl.textContent = lbl;
+    header.appendChild(labelEl);
+
+    // Timing selector
+    const timingSel = document.createElement('select');
+    timingSel.className = 'act-timing-sel';
+    [['before','Avant'], ['after','Après']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t;
+      if (v === (act.timing || 'after')) o.selected = true;
+      timingSel.appendChild(o);
+    });
+    timingSel.addEventListener('change', () => {
+      w.actions[i].timing = timingSel.value;
+      setDirty(true);
+    });
+    header.appendChild(timingSel);
+
+    const mkBtn = (txt, title, cls, cb) => {
+      const b = document.createElement('button');
+      b.className = 'icon-btn' + (cls ? ' ' + cls : '');
+      b.textContent = txt; b.title = title;
+      b.addEventListener('click', cb);
+      return b;
+    };
+    header.appendChild(mkBtn('↑', 'Monter',     '',       () => moveActUp(i)));
+    header.appendChild(mkBtn('↓', 'Descendre',  '',       () => moveActDown(i)));
+    header.appendChild(mkBtn('🗑','Supprimer',  'danger', () => deleteAct(i)));
+    div.appendChild(header);
+
+    // ── Params row (editable inline) ───────────────────────────────
+    if (def && def.params.length > 0) {
+      const paramsRow = document.createElement('div');
+      paramsRow.className = 'act-params-row';
+
+      def.params.forEach(p => {
+        const g = document.createElement('div');
+        g.className = 'act-param-g';
+        const lbl2 = document.createElement('label');
+        lbl2.textContent = p.label;
+        g.appendChild(lbl2);
+
+        const curVal = (act.params && act.params[p.key] !== undefined)
+          ? act.params[p.key] : p.def;
+
+        if (p.type === 'select') {
+          const sel = document.createElement('select');
+          p.options.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.v; opt.textContent = o.l;
+            if (String(o.v) === String(curVal)) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          sel.addEventListener('change', () => {
+            if (!w.actions[i].params) w.actions[i].params = {};
+            w.actions[i].params[p.key] = sel.value;
+            setDirty(true);
+          });
+          g.appendChild(sel);
+        } else {
+          const inp = document.createElement('input');
+          inp.type = 'number'; inp.value = curVal;
+          if (p.min  !== undefined) inp.min  = p.min;
+          if (p.max  !== undefined) inp.max  = p.max;
+          if (p.step !== undefined) inp.step = p.step;
+          inp.addEventListener('input', () => {
+            if (!w.actions[i].params) w.actions[i].params = {};
+            const v = parseFloat(inp.value);
+            w.actions[i].params[p.key] = isNaN(v) ? p.def : v;
+            setDirty(true);
+          });
+          g.appendChild(inp);
+        }
+        paramsRow.appendChild(g);
+      });
+      div.appendChild(paramsRow);
+    }
+
+    list.appendChild(div);
+  });
+}
+
+// Render the "add action" params area below the selector
+function renderAddParams() {
+  const sel  = document.getElementById('act-type-sel');
+  const area = document.getElementById('act-add-params');
+  const def  = ACTION_DEFS[sel.value];
+  if (!def || def.params.length === 0) { area.classList.add('hidden'); return; }
+  area.classList.remove('hidden');
+  area.innerHTML = '';
+  def.params.forEach(p => {
+    const g = document.createElement('div');
+    g.className = 'act-param-g';
+    g.innerHTML = `<label>${p.label}</label>`;
+    if (p.type === 'select') {
+      const s = document.createElement('select');
+      s.id = `ap-${p.key}`;
+      p.options.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.v; opt.textContent = o.l;
+        if (String(o.v) === String(p.def)) opt.selected = true;
+        s.appendChild(opt);
+      });
+      g.appendChild(s);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.id = `ap-${p.key}`; inp.value = p.def;
+      if (p.min  !== undefined) inp.min  = p.min;
+      if (p.max  !== undefined) inp.max  = p.max;
+      if (p.step !== undefined) inp.step = p.step;
+      g.appendChild(inp);
+    }
+    area.appendChild(g);
+  });
+}
+
+function addAction() {
+  if (editIdx < 0) return;
+  const sel    = document.getElementById('act-type-sel');
+  const defKey = sel.value;
+  if (!defKey) return;
+  const def    = ACTION_DEFS[defKey];
+  const timing = document.getElementById('act-timing-sel').value || 'after';
+
+  const params = {};
+  (def?.params || []).forEach(p => {
+    const el = document.getElementById(`ap-${p.key}`);
+    if (el) {
+      const v = p.type === 'number' ? parseFloat(el.value) : el.value;
+      params[p.key] = isNaN(v) ? p.def : v;
+    } else {
+      params[p.key] = p.def;
+    }
+  });
+
+  if (!strat.waypoints[editIdx].actions) strat.waypoints[editIdx].actions = [];
+  strat.waypoints[editIdx].actions.push({ defKey, params, timing });
+  setDirty(true);
+  renderActList();
+
+  sel.value = '';
+  document.getElementById('act-add-params').classList.add('hidden');
+}
+
+function deleteAct(i) {
+  if (editIdx < 0) return;
+  strat.waypoints[editIdx].actions.splice(i, 1);
+  setDirty(true); renderActList();
+}
+function moveActUp(i) {
+  if (editIdx < 0 || i === 0) return;
+  const a = strat.waypoints[editIdx].actions;
+  [a[i-1], a[i]] = [a[i], a[i-1]];
+  setDirty(true); renderActList();
+}
+function moveActDown(i) {
+  if (editIdx < 0) return;
+  const a = strat.waypoints[editIdx].actions;
+  if (i >= a.length - 1) return;
+  [a[i], a[i+1]] = [a[i+1], a[i]];
+  setDirty(true); renderActList();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Mirror strategy (bleu ↔ jaune)
+// ═══════════════════════════════════════════════════════════════════
+function normalizeAngle(rad) {
+  while (rad >  Math.PI) rad -= 2 * Math.PI;
+  while (rad < -Math.PI) rad += 2 * Math.PI;
+  return parseFloat(rad.toFixed(5));
+}
+
+function mirrorStrategy() {
+  if (strat.waypoints.length === 0) { alert('Aucun waypoint à miroir.'); return; }
+  if (!confirm(
+    'Créer une version miroir (bleu ↔ jaune) ?\n\n' +
+    '• X devient 3.0 − X\n' +
+    '• θ devient π − θ (rotation symétrique)\n\n' +
+    'La stratégie courante sera remplacée (penser à sauvegarder d\'abord).'
+  )) return;
+
+  strat.waypoints = strat.waypoints.map(w => ({
+    ...w,
+    x:     parseFloat((ARENA_W - w.x).toFixed(4)),
+    theta: normalizeAngle(Math.PI - w.theta),
+    actions: (w.actions || []).map(a => ({
+      ...a,
+      params: { ...(a.params || {}) },
+    })),
+  }));
+
+  strat.team = normalizeTeam(strat.team === 'blue' ? 'yellow' : 'blue');
+
+  // Swap Bleu/Jaune in name
+  let name = strat.name;
+  if (/bleu/i.test(name)) {
+    name = name.replace(/bleu/gi, m => m[0] === m[0].toUpperCase() ? 'Jaune' : 'jaune');
+  } else if (/jaune/i.test(name)) {
+    name = name.replace(/jaune/gi, m => m[0] === m[0].toUpperCase() ? 'Bleu' : 'bleu');
+  } else {
+    name = name + ' (miroir)';
+  }
+  strat.name = name;
+  stratFile  = '';  // force "save as new"
+
+  document.getElementById('inp-name').value = name;
+  syncTeamUI();
+  setDirty(true);
+  drawCanvas();
+  refreshTable();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dirty state
+// ═══════════════════════════════════════════════════════════════════
+function setDirty(v) {
+  dirty = v;
+  document.getElementById('dirty-badge').classList.toggle('visible', v);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Strategy list
+// ═══════════════════════════════════════════════════════════════════
+async function loadStratList() {
+  const res  = await fetch('/api/strategy/list');
+  const list = await res.json();
+  const el   = document.getElementById('strat-list');
+  el.innerHTML = '';
+  if (list.length === 0) {
+    el.innerHTML = '<div style="padding:20px 12px;color:var(--text-dim);font-size:12px;text-align:center">Aucune stratégie<br>Créez-en une !</div>';
+    return;
+  }
+  list.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'strat-item' + (s.file === stratFile ? ' active' : '');
+    div.innerHTML = `
+      <div style="flex:1;overflow:hidden">
+        <div class="strat-name">${esc(s.name || s.file)}</div>
+        <div class="strat-file">${esc(s.file)}</div>
+      </div>
+      <div class="strat-btns">
+        <button class="icon-btn" title="Dupliquer">⎘</button>
+        <button class="icon-btn" title="Renommer">✏</button>
+        <button class="icon-btn danger" title="Supprimer">🗑</button>
+      </div>`;
+    div.addEventListener('click', (e) => {
+      if (e.target.closest('.strat-btns')) return;
+      loadStrategy(s.file);
+    });
+    const btns = div.querySelectorAll('.strat-btns button');
+    btns[0].addEventListener('click', (e) => { e.stopPropagation(); duplicateStrategy(s.file); });
+    btns[1].addEventListener('click', (e) => { e.stopPropagation(); openRename(s.file, s.name || ''); });
+    btns[2].addEventListener('click', (e) => { e.stopPropagation(); deleteStrategy(s.file); });
+    el.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Strategy CRUD
+// ═══════════════════════════════════════════════════════════════════
+async function loadStrategy(file) {
+  if (dirty && !confirm('Modifications non sauvegardées — continuer ?')) return;
+  const res  = await fetch(`/api/strategy/detail?file=${encodeURIComponent(file)}`);
+  const data = await res.json();
+  strat.name        = data.name        || '';
+  strat.description = data.description || '';
+  strat.team        = normalizeTeam(data.team || 'blue');
+  strat.version     = data.version     || 1;
+  strat.waypoints   = (data.waypoints || []).map(w => {
+    let actions = [];
+    if (Array.isArray(w.actions) && w.actions.length > 0) {
+      actions = w.actions.map(a => parseAction(a)).filter(Boolean);
+    } else if (w.action) {
+      const parsed = parseAction(w.action);
+      if (parsed) actions = [parsed];
+    }
+    return {
+      id:              w.id  || nextId++,
+      x:               w.x   ?? 0,
+      y:               w.y   ?? 0,
+      theta:           w.theta ?? 0,
+      hold:            w.hold  ?? true,
+      ignore_theta:    w.ignore_theta ?? false,
+      speed_limit_pct: w.speed_limit_pct ?? 100,
+      actions,
+    };
+  });
+  nextId = Math.max(...strat.waypoints.map(w => w.id || 0), 0) + 1;
+  stratFile = file;
+  document.getElementById('inp-name').value = strat.name;
+  document.getElementById('inp-desc').value = strat.description;
+  syncTeamUI();
+  editIdx = -1;
+  setDirty(false);
+  drawCanvas(); refreshTable(); loadStratList();
+}
+
+function buildWaypointsForSave() {
+  return strat.waypoints.map((w, i) => ({
+    id:              i + 1,
+    x:               parseFloat(w.x.toFixed(4)),
+    y:               parseFloat(w.y.toFixed(4)),
+    theta:           parseFloat((w.theta ?? 0).toFixed(5)),
+    hold:            w.hold ?? true,
+    ignore_theta:    w.ignore_theta ?? false,
+    speed_limit_pct: w.speed_limit_pct ?? 100,
+    action:  null,
+    actions: (w.actions || []).map(a => serializeAction(a)),
+  }));
+}
+
+async function saveStrategy() {
+  if (editIdx >= 0) flushModal();
+  strat.name        = (document.getElementById('inp-name').value.trim()) || 'Sans nom';
+  strat.description = document.getElementById('inp-desc').value.trim();
+  strat.team        = normalizeTeam(document.getElementById('inp-team').value);
+
+  const body = {
+    file:        stratFile,
+    name:        strat.name,
+    team:        strat.team,
+    description: strat.description,
+    version:     strat.version || 1,
+    waypoints:   buildWaypointsForSave(),
+  };
+  const res  = await fetch('/api/strategy/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    stratFile = data.file;
+    setDirty(false);
+    loadStratList();
+  } else {
+    alert('Erreur sauvegarde : ' + (data.error || '?'));
+  }
+}
+
+function newStrategy() {
+  if (dirty && !confirm('Modifications non sauvegardées — continuer ?')) return;
+  strat = { name: 'Nouvelle stratégie', description: '', team: 'blue', version: 1, waypoints: [] };
+  stratFile = ''; nextId = 1; editIdx = -1;
+  document.getElementById('inp-name').value = strat.name;
+  document.getElementById('inp-desc').value = '';
+  syncTeamUI();
+  setDirty(false); drawCanvas(); refreshTable(); loadStratList();
+  document.getElementById('inp-name').focus();
+  document.getElementById('inp-name').select();
+}
+
+async function deleteStrategy(file) {
+  if (!confirm(`Supprimer "${file}" ?\nCette action est irréversible.`)) return;
+  await fetch(`/api/strategy/delete?file=${encodeURIComponent(file)}`, { method: 'DELETE' });
+  if (file === stratFile) newStrategy();
+  loadStratList();
+}
+
+async function duplicateStrategy(file) {
+  const res  = await fetch('/api/strategy/duplicate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ src_file: file }),
+  });
+  const data = await res.json();
+  if (data.ok) loadStratList();
+}
+
+// ── Rename ──────────────────────────────────────────────────────────
+let _renameFile = '';
+function openRename(file, name) {
+  _renameFile = file;
+  document.getElementById('rename-title').textContent = `Renommer "${name}"`;
+  document.getElementById('rename-inp').value = name;
+  document.getElementById('rename-modal').classList.remove('hidden');
+  setTimeout(() => { const i = document.getElementById('rename-inp'); i.focus(); i.select(); }, 50);
+}
+function closeRename() {
+  document.getElementById('rename-modal').classList.add('hidden');
+}
+async function confirmRename() {
+  const newName = document.getElementById('rename-inp').value.trim();
+  if (!newName) return;
+  const res  = await fetch(`/api/strategy/detail?file=${encodeURIComponent(_renameFile)}`);
+  const data = await res.json();
+  await fetch('/api/strategy/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file: _renameFile, name: newName, team: normalizeTeam(data.team || 'blue'), description: data.description || '', version: data.version || 1, waypoints: data.waypoints || [] }),
+  });
+  if (_renameFile === stratFile) {
+    strat.name = newName;
+    document.getElementById('inp-name').value = newName;
+  }
+  closeRename(); loadStratList();
+}
+
+// ── Import / Export ──────────────────────────────────────────────────
+function exportJSON() {
+  if (editIdx >= 0) flushModal();
+  strat.name        = document.getElementById('inp-name').value.trim() || 'Sans nom';
+  strat.description = document.getElementById('inp-desc').value.trim();
+  strat.team        = normalizeTeam(document.getElementById('inp-team').value);
+  const data = {
+    name: strat.name, team: strat.team, description: strat.description, version: strat.version || 1,
+    waypoints: buildWaypointsForSave(),
+  };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = stratFile || `strategy_export.json`;
+  a.click();
+}
+
+function importJSON(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      strat.name        = data.name        || 'Importé';
+      strat.description = data.description || '';
+      strat.team        = normalizeTeam(data.team || 'blue');
+      strat.version     = data.version     || 1;
+      strat.waypoints   = (data.waypoints || []).map(w => {
+        let actions = [];
+        if (Array.isArray(w.actions) && w.actions.length > 0) {
+          actions = w.actions.map(a => parseAction(a)).filter(Boolean);
+        } else if (w.action) {
+          const parsed = parseAction(w.action);
+          if (parsed) actions = [parsed];
+        }
+        return {
+          id: w.id || nextId++,
+          x: w.x ?? 0, y: w.y ?? 0, theta: w.theta ?? 0,
+          hold: w.hold ?? true, ignore_theta: w.ignore_theta ?? false,
+          speed_limit_pct: w.speed_limit_pct ?? 100,
+          actions,
+        };
+      });
+      document.getElementById('inp-name').value = strat.name;
+      document.getElementById('inp-desc').value = strat.description;
+      syncTeamUI();
+      setDirty(true); drawCanvas(); refreshTable();
+    } catch { alert('Fichier JSON invalide'); }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+</body>
+</html>

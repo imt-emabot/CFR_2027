@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A2'LIN Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header id="hdr">
+  <div class="hdr-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+      <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span class="brand-name">A2'LIN</span>
+  </div>
+
+  <div class="hdr-pills">
+    <span class="pill" id="pill-ws"><span class="dot" id="dot-ws"></span>WS</span>
+    <span class="pill" id="pill-bau"><span class="dot" id="dot-bau"></span>BAU</span>
+    <span class="pill pill-nav">NAV <span id="hdr-nav-state">IDLE</span></span>
+    <span class="pill pill-strat">MISSION <span id="hdr-strat-state">IDLE</span></span>
+  </div>
+
+  <div class="hdr-right">
+    <span class="hdr-temp" id="hdr-temp">--.-°C</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-clock" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<!-- ═══════════════════ NAV TABS ═══════════════════ -->
+<nav id="main-nav">
+  <button class="nav-btn active" data-tab="systeme" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    Système
+  </button>
+  <button class="nav-btn" data-tab="navigation" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    Navigation
+  </button>
+  <button class="nav-btn" data-tab="strategie" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    Stratégie
+  </button>
+  <button class="nav-btn" data-tab="actionneurs" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    Actionneurs
+  </button>
+  <button class="nav-btn" data-tab="camera" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    Caméra
+  </button>
+  <button class="nav-btn" data-tab="can" onclick="switchTab(this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Log CAN
+  </button>
+  <button id="can-close-btn" class="nav-close-btn" style="display:none" onclick="closeCanTab()">&#x2715; Fermer</button>
+</nav>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app">
+
+  <!-- ─── Tab : Système ─── -->
+  <div class="tab-page active" id="page-systeme">
+
+    <!-- Card haut gauche : ALIMENTATION -->
+    <div class="card" style="grid-area:ali">
+      <div class="card-hdr"><span class="card-title">ALIMENTATION</span></div>
+      <div class="power-metrics">
+        <div class="metric-card">
+          <span class="metric-val" id="voltage">--.-</span>
+          <span class="metric-unit">V</span>
+          <span class="metric-lbl">Tension</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val" id="current">-.--</span>
+          <span class="metric-unit">A</span>
+          <span class="metric-lbl">Courant</span>
+        </div>
+      </div>
+      <div id="bau-indicator" class="bau-ok">◉ BAU : OK</div>
+
+      <div class="separator"></div>
+      <div class="card-hdr"><span class="card-title">ODOMÉTRIE</span></div>
+      <div class="kv-grid">
+        <span class="dim">X</span><span class="mono" id="sys-x">0.000 m</span>
+        <span class="dim">Y</span><span class="mono" id="sys-y">0.000 m</span>
+        <span class="dim">Theta</span><span class="mono" id="sys-theta">0.0°</span>
+        <span class="dim">Perception</span><span class="mono" id="sys-perc">--</span>
+      </div>
+    </div>
+
+    <!-- Card haut droite : RASPBERRY PI 5 -->
+    <div class="card" style="grid-area:pi">
+      <div class="card-hdr"><span class="card-title">RASPBERRY PI 5</span></div>
+      <div class="pi-temp-big" id="sys-temp-big">--.-°C</div>
+      <div class="pi-bar-row">
+        <span class="dim">Temp</span>
+        <div class="bar-track">
+          <div class="bar-fill bar-temp" id="bar-temp" style="width:0%"></div>
+        </div>
+        <span class="mono dim" id="bar-temp-lbl">--°C</span>
+      </div>
+      <div class="pi-bar-row">
+        <span class="dim">RAM</span>
+        <div class="bar-track">
+          <div class="bar-fill bar-mem" id="bar-mem" style="width:0%"></div>
+        </div>
+        <span class="mono dim" id="bar-mem-lbl">--%</span>
+      </div>
+      <div class="pi-bar-row">
+        <span class="dim">Load</span>
+        <div class="bar-track">
+          <div class="bar-fill bar-load" id="bar-load" style="width:0%"></div>
+        </div>
+        <span class="mono dim" id="bar-load-lbl">-.--</span>
+      </div>
+    </div>
+
+    <!-- Card bas pleine largeur : RELAIS -->
+    <div class="card" style="grid-area:relay">
+      <div class="card-hdr"><span class="card-title">RELAIS</span></div>
+      <div class="relay-big-grid">
+        <button class="relay-big-btn relay-off" id="relay-btn-5v" onclick="toggleRelay('5v')">
+          <span style="font-size:22px">5V</span>
+          <span id="relay-lbl-5v">OFF</span>
+        </button>
+        <button class="relay-big-btn relay-off" id="relay-btn-12v" onclick="toggleRelay('12v')">
+          <span style="font-size:22px">12V</span>
+          <span id="relay-lbl-12v">OFF</span>
+        </button>
+        <button class="relay-big-btn relay-off" id="relay-btn-24v" onclick="toggleRelay('24v')">
+          <span style="font-size:22px">24V</span>
+          <span id="relay-lbl-24v">OFF</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── Tab : Navigation ─── -->
+  <div class="tab-page" id="page-navigation">
+    <div class="nav-overlay">
+      <span class="mono dim" id="pose-display" style="background:rgba(9,9,26,0.75);padding:4px 8px;border-radius:5px;font-size:12px">x:0.000  y:0.000  θ:0.0°</span>
+      <span class="badge" id="nav-badge">IDLE</span>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="clearTrajectory()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+        Effacer traj.
+      </button>
+    </div>
+    <canvas id="arena-canvas"></canvas>
+  </div>
+
+  <!-- ─── Tab : Stratégie ─── -->
+  <div class="tab-page" id="page-strategie">
+
+    <!-- Colonne gauche : sélection + contrôles -->
+    <div class="card">
+      <div class="card-hdr"><span class="card-title">FICHIERS STRATÉGIE</span></div>
+      <div id="strategy-list" class="strat-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" style="flex:1" onclick="enterMatchMode()">&#x1F3C1; Mode Match</button>
+        <button class="btn btn-danger" style="flex:1" onclick="stopMission()">&#x25A0; Arrêter</button>
+      </div>
+      <div class="info-line">Mission : <span class="mono" id="mission-state">IDLE</span></div>
+    </div>
+
+    <!-- Colonne droite : résumé stratégie -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">RÉSUMÉ STRATÉGIE</span>
+        <span id="strat-team-badge" class="badge" style="display:none"></span>
+      </div>
+      <div id="strat-detail-empty" style="padding:20px;color:var(--text-dim);font-size:12px">
+        Sélectionnez une stratégie pour afficher le détail.
+      </div>
+      <div id="strat-detail-content" style="display:none;flex:1;overflow-y:auto;min-height:0">
+        <div style="padding:8px 12px 4px">
+          <div style="font-size:13px;font-weight:700;color:var(--bright)" id="strat-detail-name"></div>
+        </div>
+        <div id="strat-waypoints-list" class="wp-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── Tab : Actionneurs ─── -->
+  <div class="tab-page" id="page-actionneurs">
+
+    <!-- Colonne 1 : DÉPLACEMENTS -->
+    <div class="card">
+      <div class="card-hdr"><span class="card-title">DÉPLACEMENTS</span></div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:4px;flex:1">
+        <button class="btn btn-danger btn-touch" onclick="motorStop()">Stop (NAV cancel)</button>
+        <button class="btn btn-jaune btn-touch" onclick="calage('jaune')">Calage Jaune</button>
+        <button class="btn btn-bleu btn-touch" onclick="calage('bleu')">Calage Bleu</button>
+        <button class="btn btn-secondary btn-touch" onclick="motorForward(0.5, 0.2)">Avancer 0.5 m</button>
+        <button class="btn btn-secondary btn-touch" onclick="motorRotate(90)">Tourner +90°</button>
+        <button class="btn btn-secondary btn-touch" onclick="motorRotate(-90)">Tourner -90°</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-touch" onclick="openCoeffPopup()">⚙ Coefficients moteur</button>
+      </div>
+    </div>
+
+    <!-- Colonne 2 : BRAS -->
+    <div class="card">
+      <div class="card-hdr"><span class="card-title">BRAS</span></div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:4px;flex:1">
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('servo_init')">Position initiale</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('thermo_open')">Open Thermomètre</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('thermo_close')">Close Thermometre</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('arm_deploy')">Déployer</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('arm_init')">Ranger</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('grab_element')">Sequence grab</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('release_element')">Sequence release</button>
+        <button class="btn btn-secondary btn-touch" onclick="armPreset('turn_element')">Sequence turn</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-touch" onclick="openServoPopup()">⚙ Contrôle servos</button>
+      </div>
+    </div>
+
+    <!-- Colonne 3 : CONVOYEUR + ASCENSEUR -->
+    <div class="act-right-col">
+
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">CONVOYEUR</span></div>
+        <div class="conv-btns">
+          <button class="btn btn-secondary btn-xl" onclick="sendConveyor(-1)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="11 5 2 12 11 19 11 5"/><polygon points="22 5 13 12 22 19 22 5"/></svg>
+            Recul
+          </button>
+          <button class="btn btn-danger btn-xl" onclick="sendConveyor(0)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"/></svg>
+            Stop
+          </button>
+          <button class="btn btn-secondary btn-xl" onclick="sendConveyor(1)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 5 22 12 13 19 13 5"/><polygon points="2 5 11 12 2 19 2 5"/></svg>
+            Avance
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1;min-height:0">
+        <div class="card-hdr">
+          <span class="card-title">ASCENSEUR</span>
+          <span class="badge" id="elev-val">0 %</span>
+        </div>
+        <div class="elev-vertical">
+          <input type="range" id="elevator" min="0" max="100" value="0"
+                 class="elev-range" oninput="onElevator(this.value)">
+        </div>
+        <div class="btn-row" style="justify-content:space-between">
+          <button class="btn btn-secondary" style="flex:1" onclick="setElevator(0)">▼ Bas</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="setElevator(50)">Mi</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="setElevator(100)">▲ Haut</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ─── Tab : Caméra ─── -->
+  <div class="tab-page" id="page-camera">
+
+    <!-- Colonne gauche : flux vidéo avec overlay AR -->
+    <div class="card" style="position:relative;overflow:hidden">
+      <div class="card-hdr">
+        <span class="card-title">FLUX CAMÉRA + AR</span>
+        <span class="badge" id="cam-fps">— fps</span>
+      </div>
+      <div id="camera-wrapper" style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000">
+        <img id="camera-stream" src="" style="max-width:100%;max-height:100%;display:none">
+        <canvas id="camera-overlay" style="position:absolute;inset:0;pointer-events:none;width:100%;height:100%"></canvas>
+        <div id="camera-empty" style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px">
+          Caméra hors ligne — cliquez sur « Activer le flux »
+        </div>
+      </div>
+      <div class="btn-row" style="padding:6px">
+        <button class="btn btn-primary" style="flex:1" onclick="toggleCameraStream()">
+          <span id="cam-toggle-lbl">▶ Activer le flux</span>
+        </button>
+        <button class="btn btn-ghost" style="flex:1" onclick="toggleArOverlay()">
+          <span id="cam-overlay-lbl">◉ Overlay AR : ON</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Colonne droite : liste des tags détectés -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">TAGS ARUCO DÉTECTÉS</span>
+        <span class="badge" id="aruco-count">0</span>
+      </div>
+      <div id="aruco-list" class="strat-list" style="flex:1;overflow-y:auto"></div>
+      <div style="padding:8px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--border)">
+        Triés du plus proche au plus loin.<br>
+        Distance = OpenCV solvePnP si caméra calibrée, sinon taille apparente.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── Tab : Log CAN ─── -->
+  <div class="tab-page" id="page-can">
+
+    <!-- Colonne gauche : log -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">TRAMES CAN</span>
+        <button class="btn-icon" onclick="clearCanLog()" title="Effacer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>
+      <div class="can-log-box" id="can-log-box"></div>
+    </div>
+
+    <!-- Colonne droite : envoi commande -->
+    <div class="card">
+      <div class="card-hdr"><span class="card-title">ENVOI COMMANDE</span></div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:8px;flex:1">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--text-dim)">Carte</label>
+          <select id="can-board" onchange="buildCanSendUI()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:inherit;font-size:12px">
+            <option value="nucleo_mot">Nucleo MOT</option>
+            <option value="nucleo_power">Nucleo POWER</option>
+            <option value="nucleo_arm">Nucleo ARM</option>
+            <option value="nucleo_act">Nucleo ACT</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--text-dim)">Commande</label>
+          <select id="can-cmd" onchange="buildCanSendUI()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:inherit;font-size:12px"></select>
+        </div>
+        <div id="can-params" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" style="width:100%;min-height:44px;font-size:13px" onclick="sendCanCommand()">Envoyer</button>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- #app -->
+
+<!-- Modal coefficients moteur -->
+<div class="modal hidden" id="coeff-modal">
+  <div class="modal-box modal-box-wide">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="modal-title">COEFFICIENTS MOTEUR</div>
+      <button class="btn-icon" onclick="closeCoeffPopup()" title="Fermer" style="font-size:16px;color:var(--text-dim)">✕</button>
+    </div>
+
+    <div class="modal-cols3">
+
+      <!-- Colonne 1 : Vitesse PID -->
+      <div class="modal-col">
+        <div class="modal-section-title">Vitesse PID</div>
+        <div class="modal-field">
+          <label>vel_kp <span class="coeff-id">0x01</span></label>
+          <input type="number" id="coeff-vel_kp" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>vel_ki <span class="coeff-id">0x02</span></label>
+          <input type="number" id="coeff-vel_ki" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>vel_i_limit <span class="coeff-id">0x03</span></label>
+          <input type="number" id="coeff-vel_i_limit" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_wheel_speed_mps <span class="coeff-id">0x04</span></label>
+          <input type="number" id="coeff-max_wheel_speed_mps" step="0.01" min="0">
+        </div>
+      </div>
+
+      <!-- Colonne 2 : Hold Zero -->
+      <div class="modal-col">
+        <div class="modal-section-title">Hold Zero</div>
+        <div class="modal-field">
+          <label>kp_x <span class="coeff-id">0x10</span></label>
+          <input type="number" id="coeff-hold_zero_kp_x" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>kp_y <span class="coeff-id">0x11</span></label>
+          <input type="number" id="coeff-hold_zero_kp_y" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>kp_theta <span class="coeff-id">0x12</span></label>
+          <input type="number" id="coeff-hold_zero_kp_theta" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_linear_mps <span class="coeff-id">0x13</span></label>
+          <input type="number" id="coeff-hold_zero_max_linear_mps" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_angular_radps <span class="coeff-id">0x14</span></label>
+          <input type="number" id="coeff-hold_zero_max_angular_radps" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>pos_tol_m <span class="coeff-id">0x15</span></label>
+          <input type="number" id="coeff-hold_zero_pos_tol_m" step="0.001" min="0">
+        </div>
+        <div class="modal-field">
+          <label>theta_tol_rad <span class="coeff-id">0x16</span></label>
+          <input type="number" id="coeff-hold_zero_theta_tol_rad" step="0.001" min="0">
+        </div>
+      </div>
+
+      <!-- Colonne 3 : GoTo / Waypoint -->
+      <div class="modal-col">
+        <div class="modal-section-title">GoTo / Waypoint</div>
+        <div class="modal-field">
+          <label>phase1_angle_thresh <span class="coeff-id">0x20</span></label>
+          <input type="number" id="coeff-goto_phase1_angle_thresh_rad" step="0.001" min="0">
+        </div>
+        <div class="modal-field">
+          <label>phase2_dist_thresh <span class="coeff-id">0x21</span></label>
+          <input type="number" id="coeff-goto_phase2_dist_thresh_m" step="0.001" min="0">
+        </div>
+        <div class="modal-field">
+          <label>arrived_dist_m <span class="coeff-id">0x22</span></label>
+          <input type="number" id="coeff-goto_arrived_dist_m" step="0.001" min="0">
+        </div>
+        <div class="modal-field">
+          <label>arrived_angle_rad <span class="coeff-id">0x23</span></label>
+          <input type="number" id="coeff-goto_arrived_angle_rad" step="0.001" min="0">
+        </div>
+        <div class="modal-field">
+          <label>phase1_rot_kp <span class="coeff-id">0x24</span></label>
+          <input type="number" id="coeff-goto_phase1_rot_kp" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+          <label>phase2_linear_kp <span class="coeff-id">0x25</span></label>
+          <input type="number" id="coeff-goto_phase2_linear_kp" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+          <label>phase2_angular_kp <span class="coeff-id">0x26</span></label>
+          <input type="number" id="coeff-goto_phase2_angular_kp" step="0.1" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_linear_mps <span class="coeff-id">0x27</span></label>
+          <input type="number" id="coeff-goto_max_linear_mps" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_angular_half <span class="coeff-id">0x28</span></label>
+          <input type="number" id="coeff-goto_max_angular_half" step="0.01" min="0">
+        </div>
+        <div class="modal-field">
+          <label>max_deceleration_mps2 <span class="coeff-id">0x29</span></label>
+          <input type="number" id="coeff-max_deceleration_mps2" step="0.01" min="0">
+        </div>
+      </div>
+
+    </div><!-- .modal-cols3 -->
+
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-ghost" style="flex:1;font-size:11px" onclick="resetCoeffDefaults()">Valeurs défaut</button>
+      <button class="btn btn-primary" style="flex:2" onclick="saveCoefficients()">Envoyer au Nucleo</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="closeCoeffPopup()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal contrôle servos -->
+<div class="modal hidden" id="servo-modal">
+  <div class="modal-box modal-servo">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="modal-title">CONTRÔLE SERVOS</div>
+      <button class="btn-icon" onclick="closeServoPopup()" title="Fermer" style="font-size:16px;color:var(--text-dim)">✕</button>
+    </div>
+
+    <!-- Sélection du servo -->
+    <div class="servo-tabs" id="servo-tabs"></div>
+
+    <!-- Affichage angle courant -->
+    <div class="servo-angle-display" id="servo-angle-val">90°</div>
+
+    <!-- Slider -->
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <input type="range" id="servo-slider" min="0" max="180" value="90"
+             oninput="onServoSlider(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim)">
+        <span id="servo-min-lbl">0°</span>
+        <span id="servo-max-lbl">180°</span>
+      </div>
+    </div>
+
+    <!-- Saisie manuelle -->
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:11px;color:var(--text-dim);white-space:nowrap">Angle exact :</label>
+      <input type="number" id="servo-manual-input" min="0" max="180" step="1"
+             class="servo-manual-input"
+             onchange="onServoManualInput(this.value)">
+      <span style="font-size:11px;color:var(--text-dim)">°</span>
+    </div>
+
+    <button class="btn btn-ghost" onclick="closeServoPopup()">Fermer</button>
+  </div>
+</div>
+
+<!-- ═══════════════════ MODE MATCH OVERLAY ═══════════════════ -->
+<div id="match-overlay" class="match-overlay hidden">
+
+  <!-- ── Phase 1 : Préparation ── -->
+  <div id="match-phase-ready" class="match-phase">
+
+    <div class="match-header">
+      <div class="match-header-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="match-brand">A2'LIN</span>
+        <span class="badge" id="match-strat-name">—</span>
+        <span class="badge" id="match-team-badge" style="display:none"></span>
+      </div>
+      <button class="btn btn-ghost" style="font-size:13px" onclick="exitMatchMode()">&#x2715; Quitter</button>
+    </div>
+
+    <div class="match-ready-body">
+
+      <div class="match-status-grid">
+        <div class="match-status-card" id="mc-bau">
+          <div class="mc-icon">&#x1F6D1;</div>
+          <div class="mc-label">BAU</div>
+          <div class="mc-value" id="mc-bau-val">—</div>
+        </div>
+        <div class="match-status-card" id="mc-tirette">
+          <div class="mc-icon">&#x1F50C;</div>
+          <div class="mc-label">TIRETTE</div>
+          <div class="mc-value" id="mc-tirette-val">—</div>
+        </div>
+        <div class="match-status-card" id="mc-lidar">
+          <div class="mc-icon">&#x1F4E1;</div>
+          <div class="mc-label">LIDAR</div>
+          <div class="mc-value" id="mc-lidar-val">—</div>
+        </div>
+        <div class="match-status-card" id="mc-relay">
+          <div class="mc-icon">&#x26A1;</div>
+          <div class="mc-label">RELAIS</div>
+          <div class="mc-value" id="mc-relay-val">—</div>
+        </div>
+        <div class="match-status-card" id="mc-mot">
+          <div class="mc-icon">&#x2699;&#xFE0F;</div>
+          <div class="mc-label">NUCLEO MOT</div>
+          <div class="mc-value" id="mc-mot-val">—</div>
+        </div>
+        <div class="match-status-card" id="mc-power">
+          <div class="mc-icon">&#x1F50B;</div>
+          <div class="mc-label">NUCLEO PWR</div>
+          <div class="mc-value" id="mc-power-val">—</div>
+        </div>
+      </div>
+
+      <div class="match-position">
+        POSITION&nbsp;:&nbsp;<span id="mc-pose">x:0.000&nbsp;&nbsp;y:0.000&nbsp;&nbsp;&#x3B8;:0.0°</span>
+      </div>
+
+      <div id="match-waiting-banner" class="match-waiting-banner">
+        <div id="match-waiting-text">EN ATTENTE DU DÉPART...</div>
+        <div id="match-waiting-sub">Résolvez les problèmes ci-dessus</div>
+      </div>
+
+      <button id="match-force-btn" class="match-force-btn hidden" onclick="matchManualStart()">
+        &#x26A1; Démarrer quand même
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ── Phase 2 : Match en cours ── -->
+  <div id="match-phase-running" class="match-phase hidden">
+    <div class="match-running-header">
+      <span class="badge" id="mr-strat-name">—</span>
+      <span class="badge" id="mr-team-badge" style="display:none"></span>
+      <div class="match-timer-box">
+        <span id="match-timer">01:30</span>
+      </div>
+      <div id="mr-proximity-bar" class="mr-proximity-bar" title="Obstacle proche"></div>
+      <button class="btn btn-danger" style="font-size:12px;padding:4px 12px" onclick="exitMatchMode()">&#x25A0; QUITTER</button>
+    </div>
+    <canvas id="match-arena-canvas" class="match-arena-canvas"></canvas>
+    <img id="match-logo" src="/static/CFR_Logo_noir.jpg" class="match-logo hidden" alt="CFR Logo">
+  </div>
+
+</div>
+
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>

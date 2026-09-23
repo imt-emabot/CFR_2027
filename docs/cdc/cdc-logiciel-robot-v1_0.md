@@ -1973,7 +1973,7 @@ suppression.
 
 | Axe | Existant | Cible | Reprendre / Refaire |
 |---|---|---|---|
-| IHM tactile | Interface web servie par la Pi, affichée en kiosque plein écran sur l'écran tactile. Six onglets, un mode match, un éditeur de stratégie. Environ 4 900 lignes. L'affichage de batterie était alimenté par une trame que la carte alimentation n'émettait pas | Idem + onglets calibration et état système | Reprendre |
+| IHM tactile | Interface web servie par la Pi, affichée en kiosque plein écran sur l'écran tactile. Six onglets, un mode match, un éditeur de stratégie. Environ 4 900 lignes. L'affichage de batterie était alimenté par une trame que la carte alimentation n'émettait pas | Même base visuelle, sans reprendre les boutons et actions historiques ; serveur séparé, interfaces ROS définies par le noyau, onglets calibration et état système | Refaire le nœud et le contrat ; reprendre sélectivement le rendu |
 | Structure des processus | Un processus multithread pour ce qui a joué ; onze processus en conteneur pour ce qui n'a pas joué | Trois couches, noyau composé en un processus | Refaire, en gardant le découpage fonctionnel du processus unique |
 | Protocole CAN | Maison. Six opcodes descendants, deux montants. Décrit en quatre exemplaires divergents, dont l'un porte une divergence active d'unités | Maison + registre + passerelle ROS | Reprendre la sémantique, refaire la source |
 | Plan d'ID CAN | Identifiants fixes, un couple par carte, sans champ | Découpage en champs | Refaire |
@@ -2099,7 +2099,7 @@ fait de tout le match.
 | 3 | Gamme de microcontrôleurs pour les cartes refaites | Électronique | Avant routage |
 | 4 | Fils ALERT et SYNC : câbler, réserver la piste, ou abandonner | Équipe | Avant routage |
 | 5 | Protection par branche du 5 V commande ; séparation des convertisseurs | Électronique | Avant routage |
-| 6 | Où vit l'IHM : processus séparé dans le langage existant, ou affichage d'état critique réécrit dans le noyau. La technologie, elle, est tranchée — voir 17.5 | Logiciel | 2 semaines pour la décision |
+| ~~6~~ | ~~Où vit l'IHM : processus séparé dans le langage existant, ou affichage d'état critique réécrit dans le noyau~~ — **tranché** : couche et processus séparés ; `core` publie l'état critique et valide les commandes, l'IHM ne possède aucun accès direct au matériel. Le portage de l'ancien serveur et la reprise des vues restent à réaliser, voir 17.5 | Logiciel | Clos |
 | 7 | LED de défaut mémorisée par carte | Électronique | Avant routage |
 | 8 | Capteurs de distance de secours sur carte capteur | Électronique | Avant routage |
 | 9 | Seuil entre freinage doux et freinage maximal | Logiciel | Après identification |
@@ -2186,20 +2186,39 @@ la Pi, affichée en kiosque plein écran sur l'écran tactile et atteignable dep
 Wi-Fi. C'est exactement la seconde voie envisagée ici, et elle est réalisée. Le couplage au
 protocole est confiné à une table déclarative côté navigateur et à la trentaine de points
 d'entrée du serveur ; le rendu, le tracé de l'aire de jeu, le mode match et l'éditeur de
-stratégie n'en connaissent rien. La voie retenue est donc **reprendre et étendre**.
+stratégie n'en connaissent rien. La voie retenue est donc **reprendre la base visuelle et refaire le comportement**.
+
+**Décision d'architecture issue de l'audit du 23 septembre 2026.** L'IHM reste dans une
+couche et un processus distincts du noyau `core`. Elle ne sera pas ajoutée au workspace ROS
+tant que son portage n'est pas terminé. Le dossier existant reste sous `logiciel/legacy/`
+comme référence de travail, pas comme package actif.
+
+Le front HTML, CSS et JavaScript sert de base visuelle. Les boutons et actions hérités de
+l'édition précédente sont retirés avant toute reprise fonctionnelle : ils correspondent à
+des contrats ROS et à des commandes matériel qui ne sont plus la source de vérité. Le
+nouveau serveur sera reconstruit autour des interfaces publiées par `core`, sans accès
+direct aux cartes ni aux fichiers de configuration du robot.
+
+Le premier travail de portage est l'audit et la sécurisation du serveur : aucune commande
+physique ne doit être autorisée par le seul navigateur, le mode d'exécution doit être
+contrôlé côté serveur, les accès réseau doivent être limités selon le mode, et les
+opérations d'écriture doivent être bornées et journalisées. Les routes historiques
+manquantes, les accès fichiers et la concurrence entre FastAPI et ROS seront traités dans
+la même passe.
 
 *Contre-argument, et il n'est pas mineur.* Le serveur existant est écrit dans un autre
-langage que le noyau (4.3), et 16.3 place l'affichage d'état critique en couche 1. Reprendre
-l'interface telle quelle ajoute donc un sixième processus, ou impose de réécrire le serveur
-et de perdre une partie du bénéfice de la reprise. Une troisième voie existe — le noyau
-publie son état, un processus d'interface le consomme et n'a aucun droit de commande pendant
-le match — mais elle n'est pas tranchée, et c'est elle, désormais, qui est l'objet de la
-question 6 de 16.4.
+langage que le noyau (4.3), et 16.3 place l'affichage d'état critique en couche 1. Le
+serveur sera donc un processus séparé : le noyau publie l'état critique et valide les
+commandes autorisées ; l'IHM le consomme et n'a aucun droit de commande direct vers le
+matériel. Cette séparation coûte un contrat ROS supplémentaire, mais évite de faire entrer
+le serveur web et ses dépendances dans le processus qui ne doit jamais tomber.
 
 Dans les deux cas : le rendu doit être **suspendu pendant le match**, et l'IHM appartient à
 la couche 1 pour l'affichage d'état critique, à la couche 3 pour le reste.
 
-**Échéance : 2 semaines pour la décision, 6 semaines pour les deux onglets.**
+**Ordre de réalisation :** sécurité du serveur et contrat ROS, nœud minimal sans commandes
+historiques, puis reprise progressive des vues utiles et création des onglets calibration
+et état système.
 
 ### 17.6 Format du fichier de description des actions
 

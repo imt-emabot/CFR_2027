@@ -2,8 +2,8 @@
 
 Espace de travail ROS 2 (workspace colcon) du robot principal.
 
-Environnement cible (CDC logiciel, section 12) : Raspberry Pi 5, Ubuntu Server 24.04 LTS
-arm64, ROS 2 Jazzy Jalisco.
+Environnement courant : Ubuntu 26.04 arm64, ROS 2 Lyrical Luth. La cible matérielle reste
+le Raspberry Pi 5 ; le CDC logiciel conserve encore Jazzy comme choix proposé à confirmer.
 
 Découpage en processus (CDC logiciel, section 4.4), chacun un paquet :
 
@@ -23,3 +23,18 @@ seul langage (CDC logiciel, section 4.3). Le langage des autres paquets n'est pa
 tranché.
 
 Le détail de chaque paquet est dans son propre `README.md`.
+
+## Construction
+
+Depuis ce dossier, après avoir installé et sourcé ROS 2 Jazzy :
+
+```bash
+source /opt/ros/lyrical/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+```
+
+Les artefacts `build/`, `install/` et `log/` sont locaux au workspace et ne sont pas
+versionnés. Le premier bring-up se fera avec les nœuds squelettes ; Nav2, les pilotes et
+les interfaces métier seront ajoutés dans leurs packages respectifs quand leurs contrats
+seront figés.

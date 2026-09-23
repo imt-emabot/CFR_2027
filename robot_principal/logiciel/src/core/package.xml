@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>core</name>
+  <version>0.1.0</version>
+  <description>Noyau de match du robot principal.</description>
+  <maintainer email="robot@ema-bot.local">EMA Bot</maintainer>
+  <license>UNLICENSED</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1074,11 +1074,24 @@ robuste à une latence variable côté Pi.
 | `IDENT_DUMP` | `index_bloc` | Demande de restitution d'un bloc |
 | `SYNC_PING` | `t_pi` | Sondage de synchronisation d'horloge (7.3) |
 | `MATCH_T0` | `horodatage du front de tirette` | Arme la minuterie de match de la carte (7.3) |
+| `SEQ_RESET` | `session_id` | Réinitialise le contexte de séquence pendant la préparation |
 | `SAFE_PARK` | — | Rangement des actionneurs en position sûre |
 
 Le **numéro de séquence** est le mécanisme central : une file dont le `seq` est plus récent
 remplace la file courante sans arrêt du robot. Une file incomplète — `PATH_END` non reçu —
 est ignorée.
+
+Au début de chaque match, pendant la préparation et avant `MATCH_T0`, la Pi émet `SEQ_RESET`
+avec un nouveau `session_id`. Chaque carte efface sa file de mouvement, réinitialise son
+contexte de comparaison et attend `seq = 0` pour cette session. Elle acquitte le reset dans
+son état ; l'acquittement est journalisé mais ne bloque pas le départ, conformément à P6.
+Une trame de l'ancienne session ne doit jamais être acceptée après ce reset. Le
+`session_id` distingue le reset de la remise à zéro du compteur et protège contre une
+ancienne trame retardée sur le bus.
+
+Le `SEQ_RESET` n'est pas émis pendant le match. Une nouvelle file est ensuite numérotée
+`0, 1, 2, ...` ; avec une mise à jour toutes les 10 ms pendant 100 secondes, cela représente
+au plus 10 000 séquences dans un match, très inférieur aux 65 536 valeurs d'un `uint16`.
 
 **Carte moteurs → Pi**
 
@@ -1296,26 +1309,105 @@ des cartes.
 
 ### 8.5 Passerelle vers ROS [ACTÉ]
 
-Le protocole reste maison. Une passerelle traduit vers ROS pour la couche 2, **en lecture
-seule** : la couche ROS observe le bus, elle ne l'écrit pas.
+Le protocole reste maison. Une passerelle **bidirectionnelle** traduit entre le CAN et ROS
+dans le processus `core` : elle reçoit les trames des cartes, les décode vers des messages
+ROS typés, et encode les commandes ROS validées vers le CAN. ROS écoute et parle ; aucun
+autre processus n'ouvre directement l'interface CAN.
 
-Mise en œuvre par `ros2_socketcan`, qui fournit un nœud recevant les trames brutes en
-`can_msgs/Frame` et un nœud émetteur symétrique. La passerelle s'abonne aux trames brutes
-et les décode vers les messages ROS typés, avec le code généré en 8.3.
+La direction ne donne pas un droit implicite de commande. Le chemin d'émission applique les
+mêmes garde-fous que le noyau : état de match, validité des paramètres, séquence, délai
+d'expiration et priorité de la trame. Une commande ROS refusée est journalisée et retourne
+un état d'échec explicite ; elle ne doit jamais être convertie silencieusement en trame CAN.
+Les commandes de sûreté (`PAUSE`, `ABORT`, `MATCH_T0`) ont un chemin prioritaire et ne
+dépendent ni de `nav` ni de l'IHM.
 
-L'argument décisif pour passer par cette bibliothèque plutôt que d'ouvrir SocketCAN
-directement : le flux de trames brutes peut être **enregistré dans un rosbag et rejoué**.
-En cas de doute sur un comportement, on rejoue l'enregistrement et on sait immédiatement si
-le bug est dans le décodage ou dans le firmware. Sur un protocole maison, ça vaut plusieurs
-soirées.
+La passerelle s'appuie sur `ros2_socketcan` si le paquet est disponible pour la
+distribution retenue. Elle conserve le flux brut en `can_msgs/Frame` pour l'enregistrement
+et le rejeu, et expose en parallèle des topics, services ou actions ROS typés pour les
+contrats du robot. Le chemin nominal est :
 
-Deux conséquences. À 580 trames par seconde, un nœud récepteur dans un processus séparé
-coûterait une sérialisation par trame : il est **composé dans le processus `core`**, cas
-d'usage direct de 4.3. Et `ros2_socketcan` étant en C++, cela confirme que le noyau est en
-C++ et non en Python.
+```
+ROS core -> validation -> passerelle CAN -> carte
+carte -> passerelle CAN -> décodage -> ROS core
+```
 
-*À vérifier avant de s'engager :* disponibilité binaire du paquet pour la distribution
-retenue.
+La passerelle est composée dans `core`, comme le pilote lidar et la machine d'état. Son
+interface interne doit séparer explicitement réception, validation et émission afin qu'une
+trame CAN malformée ou une commande ROS invalide ne fasse pas tomber le processus.
+
+### 8.6 Méthode de conception du protocole [PROPOSÉ]
+
+Le protocole sera conçu à partir des comportements à garantir, pas à partir des structures
+C++ ou ROS. Une fiche par message doit préciser : direction, identifiant CAN, priorité,
+taille, fréquence maximale, période d'expiration, signaux, unités, échelle, valeur invalide,
+conditions d'émission, conditions de rejet et action sur défaut.
+
+Premier découpage fonctionnel à instruire :
+
+| Famille | Messages | Propriété à garantir |
+|---|---|---|
+| mouvement | `PATH_BEGIN`, `PATH_POINT`, `PATH_END`, `GOTO` | Une commande récente remplace une ancienne sans arrêt parasite |
+| sûreté | `PAUSE`, `RESUME`, `ABORT`, `SAFE_PARK` | Priorité maximale, comportement déterministe |
+| match | `MATCH_T0`, `SEQ_RESET` | Minuterie locale et contexte de séquence propres à chaque match |
+| pose | `SET_POSE`, `ODOM` | Unités, datation et autorité de la source explicites |
+| état | `STATUS`, `FAULT`, `HELLO` | Diagnostic, version et empreinte du protocole |
+| identification | `IDENT_START`, `IDENT_LIVE`, `IDENT_DUMP`, `IDENT_BLOCK` | Jamais simultané avec un déplacement |
+| temps | `SYNC_PING` | Estimation continue du décalage STM32-Pi |
+
+Le plan d'identifiants de 8.2 reste à confirmer après cette fiche de messages. Les trames
+de sûreté et de défaut doivent obtenir les plus hautes priorités CAN ; les flux périodiques
+doivent être bornés ; aucune commande ne doit être acceptée uniquement parce que son
+identifiant est connu. La carte vérifie au minimum longueur, état, séquence et plage des
+valeurs avant d'agir.
+
+Le registre DBC devient la source unique. Le code C du firmware, les encodeurs/décodeurs
+de la passerelle et les outils de diagnostic sont générés ou vérifiés à partir de ce
+registre. Un essai sur banc doit couvrir le rejeu de trames, les valeurs limites, les
+trames tronquées, les séquences périmées, la saturation du bus et la perte de la Pi.
+
+### 8.7 Convention d'unités [ACTÉ]
+
+Les unités du protocole CAN sont des unités physiques explicites. Les valeurs sont encodées
+en entiers, sans flottant sur le bus. La passerelle ROS ne convertit que les longueurs, car
+ROS utilise le mètre alors que le protocole conserve le millimètre. Les angles du CAN sont
+déjà en radians, comme dans ROS ; cela évite une conversion supplémentaire dans la
+passerelle et simplifie le firmware de la carte moteurs.
+
+| Grandeur | Unité CAN et firmware | Résolution de stockage visée | Convention stratégie et IHM |
+|---|---|---|---|
+| Position, distance, écart | `mm` | 1 mm | `mm` pour les mesures, conversion d'affichage au besoin |
+| Vitesse linéaire | `mm/s` | 1 mm/s | `mm/s` |
+| Accélération linéaire | `mm/s²` | 1 mm/s² | `mm/s²` |
+| Angle, orientation | `rad` | à confirmer ; stockage entier recommandé en microradians | `deg` pour les réglages et l'affichage |
+| Vitesse angulaire | `rad/s` | à confirmer ; stockage entier recommandé en microradians/s | `deg/s` pour les réglages et l'affichage |
+| Accélération angulaire | `rad/s²` | à confirmer ; stockage entier recommandé en microradians/s² | `deg/s²` pour les réglages et l'affichage |
+| Timestamp, délai court, watchdog | `ms` | 1 ms | affichage en `s` si la durée est longue |
+| Durée de configuration ou de séquence | `s` si la précision milliseconde n'est pas utile | à confirmer par message | `s` |
+| Masse | `kg` hors protocole moteur, sauf besoin identifié | à définir si un message la transporte | `kg` |
+
+Les timestamps transportés dans `ODOM`, `SYNC_PING` et les messages associés sont en
+millisecondes. Les temporisations de sûreté et le watchdog sont également en millisecondes
+sur le fil. Une durée exprimée en secondes n'est autorisée dans une trame que lorsque la
+précision de la milliseconde n'a aucune utilité et que le nom du signal le dit explicitement.
+
+Toute constante angulaire écrite en radians dans le code ou dans une configuration doit être
+accompagnée, sur la même ligne ou dans son commentaire associé, de sa conversion en degrés.
+Exemple : `kPauseAngle = 0.5236 rad  // 30 deg`. Cette règle s'applique au firmware, aux
+nœuds ROS et aux outils ; elle ne change pas l'unité du protocole.
+
+Les numéros de séquence sont des `uint16`. La comparaison de récence doit être faite par
+différence modulo 16 bits, et non par comparaison naïve, afin que le retour de `65535` à
+`0` ne rende pas une file récente obsolète. Le protocole ne prévoit pas plus de 65535
+séquences simultanément actives ; une seule séquence de mouvement est active à la fois sur
+la carte moteurs.
+
+Restent volontairement ouverts : la résolution entière exacte des radians, des vitesses et
+des accélérations angulaires ; la largeur et le débordement des timestamps ; les tailles
+des compteurs et des délais ; la représentation du courant et de la tension des cartes ;
+la résolution de la température, de la confiance et du PWM ; la largeur des compteurs
+d'encodeur ; les valeurs invalides et les saturations. Ces choix seront arrêtés dans le
+DBC après choix du matériel et mesures de la chaîne réelle, sans changer la convention
+d'unité ci-dessus.
 
 ---
 

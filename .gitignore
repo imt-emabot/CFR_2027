@@ -7,6 +7,20 @@ __pycache__/
 *.pyc
 .venv/
 
+# Secrets et fichiers de configuration locaux
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.secret
+secrets.*
+
+# Artefacts de construction
+build/
+install/
+log/
+
 # Fusion 360 fichiers temporaires
 ~$*.f3d
 ~$*.f3z
